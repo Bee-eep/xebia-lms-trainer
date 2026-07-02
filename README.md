@@ -25,10 +25,16 @@ All developers in the project connect to a **shared PostgreSQL database instance
    ```
 2. Open `.env` and fill in the connection details of the shared PostgreSQL database:
    ```env
-   SPRING_DATASOURCE_URL=jdbc:postgresql://<shared-db-host>:<port>/<database-name>
+   SPRING_DATASOURCE_URL=jdbc:postgresql://<shared-db-host>:<port>/<database-name>?sslmode=require
    SPRING_DATASOURCE_USERNAME=<your-shared-db-username>
    SPRING_DATASOURCE_PASSWORD=<your-shared-db-password>
    ```
+
+   > [!NOTE]
+   > **Supabase Connection Note:** The raw URI provided by Supabase uses the `postgresql://` prefix and embeds credentials. You must:
+   > 1. Change the prefix to `jdbc:postgresql://` (e.g. `jdbc:postgresql://db.xxxx.supabase.co:5432/postgres?sslmode=require`).
+   > 2. Separate the username (`postgres`) and password into the dedicated variables.
+
    > [!IMPORTANT]
    > Do NOT commit the `.env` file containing the shared database credentials to version control. It is already included in `.gitignore`.
 

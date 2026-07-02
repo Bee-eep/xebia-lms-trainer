@@ -25,10 +25,16 @@ The application reads database connection settings using the following environme
    ```
 2. Open the `.env` file and replace the default values with the **shared database** details:
    ```env
-   SPRING_DATASOURCE_URL=jdbc:postgresql://<shared-db-host>:<port>/<database-name>
+   SPRING_DATASOURCE_URL=jdbc:postgresql://<shared-db-host>:<port>/<database-name>?sslmode=require
    SPRING_DATASOURCE_USERNAME=<shared-username>
    SPRING_DATASOURCE_PASSWORD=<shared-password>
    ```
+
+   > [!NOTE]
+   > **Supabase Connection Note:** The raw URI provided by Supabase uses the `postgresql://` prefix and embeds credentials. You must:
+   > 1. Change the prefix to `jdbc:postgresql://` (e.g. `jdbc:postgresql://db.xxxx.supabase.co:5432/postgres?sslmode=require`).
+   > 2. Separate the username (`postgres`) and password into the dedicated variables.
+
 3. If using an IDE (e.g. IntelliJ IDEA, Eclipse, or VS Code), ensure your run configurations load the environment variables from this `.env` file, or install an environment file plugin (e.g., *EnvFile* for IntelliJ).
 
 ---
