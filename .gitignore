@@ -1,6 +1,9 @@
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/resources/architecture/*.html
+build/
+.keystore
+.google_market_key
 
 ### STS ###
 .apt_generated
@@ -19,39 +22,16 @@ target/
 
 ### NetBeans ###
 /nbproject/private/
+nbproject/private/
 /nbbuild/
+nbbuild/
 /dist/
+dist/
 /nbdist/
 /.nb-gradle/
 
 ### VS Code ###
 .vscode/
-
-target/
-!.mvn/wrapper/maven-wrapper.jar
-build/
-.keystore
-.google_market_key
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-
-### IntelliJ IDEA ###
-.idea/
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-nbproject/private/
-build/
-nbbuild/
-dist/
 
 ### Logs & Ops ###
 *.log
