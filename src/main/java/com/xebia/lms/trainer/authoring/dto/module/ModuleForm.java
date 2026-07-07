@@ -8,8 +8,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 /**
- * ModuleForm - what a trainer submits to add a module (a top-level
- * section) to an existing course.
+ * ModuleForm - request payload for creating or updating a module.
  */
 public record ModuleForm(
 
@@ -18,6 +17,6 @@ public record ModuleForm(
         String title,
 
         @PositiveOrZero(message = "sortOrder must be zero or positive")
-        int sortOrder
+        Integer sortOrder
 ) {
 }

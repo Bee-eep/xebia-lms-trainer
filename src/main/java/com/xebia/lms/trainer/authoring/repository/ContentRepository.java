@@ -4,6 +4,7 @@
 package com.xebia.lms.trainer.authoring.repository;
 
 import com.xebia.lms.trainer.authoring.model.Content;
+import com.xebia.lms.trainer.authoring.model.Submodule;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -15,8 +16,22 @@ import java.util.UUID;
 public interface ContentRepository extends JpaRepository<Content, UUID> {
 
     /**
-     * findBySubmoduleIdOrderBySortOrder - returns a lesson's content blocks
-     * already sorted for display.
+     * Returns all content blocks of a submodule ordered for rendering.
      */
-    List<Content> findBySubmoduleIdOrderBySortOrder(UUID submoduleId);
+    List<Content> findBySubmoduleOrderBySortOrder(Submodule submodule);
+
+    /**
+     * Returns all content blocks by submodule id ordered for rendering.
+     */
+    List<Content> findBySubmodule_SubmoduleIdOrderBySortOrder(UUID submoduleId);
+
+    /**
+     * Checks whether a submodule contains any content.
+     */
+    boolean existsBySubmodule_SubmoduleId(UUID submoduleId);
+
+    /**
+     * Deletes all content blocks belonging to a submodule.
+     */
+    void deleteBySubmodule_SubmoduleId(UUID submoduleId);
 }

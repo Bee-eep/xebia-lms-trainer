@@ -8,11 +8,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
- * CourseModule - a top-level section of a course (e.g. "Week 1"). Maps 1:1
- * to the `course_module` table. Ordered within its course by sortOrder.
+ * CourseModule - a top-level module within a course.
+ *
+ * Hierarchy:
+ * Category
+ *   └── Course
+ *        └── Module
+ *             └── SubModule
  */
 @Entity
 @Table(name = "course_module")
@@ -26,12 +32,19 @@ public class CourseModule {
     @Column(name = "module_id")
     private UUID moduleId;
 
-    @Column(name = "course_id", nullable = false)
-    private UUID courseId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
 
     @Column(nullable = false, length = 160)
     private String title;
 
     @Column(name = "sort_order", nullable = false)
-    private int sortOrder;
+    private Integer sortOrder = 0;
+
+    @OneToMany(mappedBy = "module",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY)
+    private List<Submodule> submodules;
 }

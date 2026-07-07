@@ -9,32 +9,36 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * CourseResponse - what the API returns for a course. A thin projection
- * of the Course entity, kept separate so internal columns (trainerId
- * scoping details, etc.) are only exposed deliberately, via `from`.
+ * CourseResponse - API response for a course.
  */
 public record CourseResponse(
         UUID courseId,
+        UUID categoryId,
+        String categoryName,
         String title,
+        String summary,
         String level,
         String status,
         int version,
-        Instant createdAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
 
     /**
-     * from - maps a Course entity to its API-facing representation.
-     * Centralizing the mapping here means controllers and services never
-     * hand-roll it differently in two places.
+     * Maps Course entity to CourseResponse.
      */
     public static CourseResponse from(Course course) {
         return new CourseResponse(
                 course.getCourseId(),
+                course.getCategory().getCategoryId(),
+                course.getCategory().getName(),
                 course.getTitle(),
+                course.getSummary(),
                 course.getLevel().name(),
                 course.getStatus().name(),
                 course.getVersion(),
-                course.getCreatedAt()
+                course.getCreatedAt(),
+                course.getUpdatedAt()
         );
     }
 }

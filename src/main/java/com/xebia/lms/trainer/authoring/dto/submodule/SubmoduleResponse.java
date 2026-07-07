@@ -8,24 +8,23 @@ import com.xebia.lms.trainer.authoring.model.Submodule;
 import java.util.UUID;
 
 /**
- * SubmoduleResponse - what the API returns after a lesson is added to a
- * module.
+ * SubmoduleResponse - API response for a submodule.
  */
 public record SubmoduleResponse(
         UUID submoduleId,
         UUID moduleId,
         String title,
-        int sortOrder,
+        Integer sortOrder,
         Integer estMinutes
 ) {
 
     /**
-     * from - maps a Submodule entity to its API-facing representation.
+     * Maps Submodule entity to SubmoduleResponse.
      */
     public static SubmoduleResponse from(Submodule submodule) {
         return new SubmoduleResponse(
                 submodule.getSubmoduleId(),
-                submodule.getModuleId(),
+                submodule.getModule().getModuleId(),
                 submodule.getTitle(),
                 submodule.getSortOrder(),
                 submodule.getEstMinutes()
