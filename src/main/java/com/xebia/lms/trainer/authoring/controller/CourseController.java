@@ -3,8 +3,8 @@
  */
 package com.xebia.lms.trainer.authoring.controller;
 
-import com.xebia.lms.trainer.authoring.dto.CourseForm;
-import com.xebia.lms.trainer.authoring.dto.CourseResponse;
+import com.xebia.lms.trainer.authoring.dto.*;
+import java.util.List;
 import com.xebia.lms.trainer.authoring.model.Course;
 import com.xebia.lms.trainer.authoring.service.AuthoringService;
 import jakarta.validation.Valid;
@@ -54,5 +54,50 @@ public class CourseController {
     public ResponseEntity<CourseResponse> publish(@PathVariable("id") UUID courseId) {
         Course published = authoringService.publish(courseId);
         return ResponseEntity.ok(CourseResponse.from(published));
+    }
+
+    /**
+     * getAllCourses - GET /api/v1/trainer/courses
+     * Returns a list of all courses in the system.
+     */
+    @GetMapping
+    public ResponseEntity<List<CourseResponse>> getAllCourses() {
+        List<Course> courses = authoringService.getAllCourses();
+        List<CourseResponse> responses = courses.stream()
+                .map(CourseResponse::from)
+                .toList();
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * getCourseDetail - GET /api/v1/trainer/courses/{id}
+     * Returns the full nested structure of a specific course.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<CourseDetailResponse> getCourseDetail(@PathVariable("id") UUID courseId) {
+        CourseDetailResponse response = authoringService.getCourseDetail(courseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * updateCourse - PUT /api/v1/trainer/courses/{id}
+     * Updates the metadata of a specific DRAFT course.
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<CourseResponse> updateCourse(
+            @PathVariable("id") UUID courseId,
+            @Valid @RequestBody CourseForm form) {
+        Course updated = authoringService.updateCourse(courseId, form);
+        return ResponseEntity.ok(CourseResponse.from(updated));
+    }
+
+    /**
+     * deleteCourse - DELETE /api/v1/trainer/courses/{id}
+     * Deletes a specific DRAFT course and all its modules, submodules, and content.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteCourse(@PathVariable("id") UUID courseId) {
+        authoringService.deleteCourse(courseId);
+        return ResponseEntity.noContent().build();
     }
 }

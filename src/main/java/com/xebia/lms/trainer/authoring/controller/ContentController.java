@@ -84,4 +84,52 @@ public class ContentController {
         PresignedUploadResponse response = contentMediaService.createUploadUrl(fileName, contentType);
         return ResponseEntity.ok(response);
     }
+
+    // ── Module update / delete ──────────────────────────────────────
+
+    @PutMapping("/modules/{id}")
+    public ResponseEntity<ModuleResponse> updateModule(
+            @PathVariable("id") UUID moduleId,
+            @Valid @RequestBody ModuleForm form) {
+        CourseModule updated = authoringService.updateModule(moduleId, form);
+        return ResponseEntity.ok(ModuleResponse.from(updated));
+    }
+
+    @DeleteMapping("/modules/{id}")
+    public ResponseEntity<Void> deleteModule(@PathVariable("id") UUID moduleId) {
+        authoringService.deleteModule(moduleId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── Submodule update / delete ───────────────────────────────────
+
+    @PutMapping("/submodules/{id}")
+    public ResponseEntity<SubmoduleResponse> updateSubmodule(
+            @PathVariable("id") UUID submoduleId,
+            @Valid @RequestBody SubmoduleForm form) {
+        Submodule updated = authoringService.updateSubmodule(submoduleId, form);
+        return ResponseEntity.ok(SubmoduleResponse.from(updated));
+    }
+
+    @DeleteMapping("/submodules/{id}")
+    public ResponseEntity<Void> deleteSubmodule(@PathVariable("id") UUID submoduleId) {
+        authoringService.deleteSubmodule(submoduleId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── Content update / delete ─────────────────────────────────────
+
+    @PutMapping("/content/{id}")
+    public ResponseEntity<ContentResponse> updateContent(
+            @PathVariable("id") UUID contentId,
+            @Valid @RequestBody ContentForm form) {
+        Content updated = authoringService.updateContent(contentId, form);
+        return ResponseEntity.ok(ContentResponse.from(updated));
+    }
+
+    @DeleteMapping("/content/{id}")
+    public ResponseEntity<Void> deleteContent(@PathVariable("id") UUID contentId) {
+        authoringService.deleteContent(contentId);
+        return ResponseEntity.noContent().build();
+    }
 }

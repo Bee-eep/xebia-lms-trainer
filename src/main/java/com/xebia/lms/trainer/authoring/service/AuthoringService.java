@@ -3,10 +3,8 @@
  */
 package com.xebia.lms.trainer.authoring.service;
 
-import com.xebia.lms.trainer.authoring.dto.ContentForm;
-import com.xebia.lms.trainer.authoring.dto.CourseForm;
-import com.xebia.lms.trainer.authoring.dto.ModuleForm;
-import com.xebia.lms.trainer.authoring.dto.SubmoduleForm;
+import com.xebia.lms.trainer.authoring.dto.*;
+import java.util.List;
 import com.xebia.lms.trainer.authoring.model.Content;
 import com.xebia.lms.trainer.authoring.model.Course;
 import com.xebia.lms.trainer.authoring.model.CourseModule;
@@ -72,13 +70,14 @@ public class AuthoringService {
     }
 
     /**
-     * addModule - appends a top-level section to a course. Guarded so
-     * modules can only be added while the course is still DRAFT; once
-     * PUBLISHED the structure is frozen for learners already enrolled.
+     * addModule - appends a top-level section to a course. Allowed for
+     * both DRAFT and PUBLISHED courses so trainers can update content
+     * at any time.
      */
     @Transactional
     public CourseModule addModule(UUID courseId, ModuleForm form) {
-        Course course = requireDraftCourse(courseId);
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("course not found: " + courseId));
 
         CourseModule module = new CourseModule();
         module.setCourseId(course.getCourseId());
@@ -158,4 +157,132 @@ public class AuthoringService {
         }
         return course;
     }
+
+    /**
+     * getAllCourses - retrieves all courses authored in the system.
+     */
+    @Transactional(readOnly = true)
+    public List<Course> getAllCourses() {
+        return courseRepository.findAll();
+    }
+
+    /**
+     * getCourseDetail - retrieves a course and all its modules, submodules,
+     * and content blocks in a single nested DTO structure.
+     */
+    @Transactional(readOnly = true)
+    public CourseDetailResponse getCourseDetail(UUID courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("course not found: " + courseId));
+
+        List<CourseModule> modules = moduleRepository.findByCourseIdOrderBySortOrder(courseId);
+        List<ModuleDetailResponse> moduleDetails = modules.stream().map(module -> {
+            List<Submodule> submodules = submoduleRepository.findByModuleIdOrderBySortOrder(module.getModuleId());
+            List<SubmoduleDetailResponse> submoduleDetails = submodules.stream().map(submodule -> {
+                List<Content> contents = contentRepository.findBySubmoduleIdOrderBySortOrder(submodule.getSubmoduleId());
+                List<ContentDetailResponse> contentDetails = contents.stream()
+                        .map(ContentDetailResponse::from)
+                        .toList();
+                return SubmoduleDetailResponse.from(submodule, contentDetails);
+            }).toList();
+            return ModuleDetailResponse.from(module, submoduleDetails);
+        }).toList();
+
+        return CourseDetailResponse.from(course, moduleDetails);
+    }
+
+    @Transactional
+    public Course updateCourse(UUID courseId, CourseForm form) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("course not found: " + courseId));
+        course.setDomainId(form.domainId());
+        course.setTitle(form.title());
+        course.setSummary(form.summary());
+        course.setLevel(form.level());
+        return courseRepository.save(course);
+    }
+
+    @Transactional
+    public void deleteCourse(UUID courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("course not found: " + courseId));
+        List<CourseModule> modules = moduleRepository.findByCourseIdOrderBySortOrder(courseId);
+        for (CourseModule mod : modules) {
+            List<Submodule> submodules = submoduleRepository.findByModuleIdOrderBySortOrder(mod.getModuleId());
+            for (Submodule sub : submodules) {
+                List<Content> contents = contentRepository.findBySubmoduleIdOrderBySortOrder(sub.getSubmoduleId());
+                contentRepository.deleteAll(contents);
+                submoduleRepository.delete(sub);
+            }
+            moduleRepository.delete(mod);
+        }
+        courseRepository.delete(course);
+    }
+
+    // ── Module update / delete ──────────────────────────────────────
+
+    @Transactional
+    public CourseModule updateModule(UUID moduleId, ModuleForm form) {
+        CourseModule module = moduleRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("module not found: " + moduleId));
+        module.setTitle(form.title());
+        module.setSortOrder(form.sortOrder());
+        return moduleRepository.save(module);
+    }
+
+    @Transactional
+    public void deleteModule(UUID moduleId) {
+        CourseModule module = moduleRepository.findById(moduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("module not found: " + moduleId));
+        List<Submodule> submodules = submoduleRepository.findByModuleIdOrderBySortOrder(moduleId);
+        for (Submodule sub : submodules) {
+            List<Content> contents = contentRepository.findBySubmoduleIdOrderBySortOrder(sub.getSubmoduleId());
+            contentRepository.deleteAll(contents);
+            submoduleRepository.delete(sub);
+        }
+        moduleRepository.delete(module);
+    }
+
+    // ── Submodule update / delete ───────────────────────────────────
+
+    @Transactional
+    public Submodule updateSubmodule(UUID submoduleId, SubmoduleForm form) {
+        Submodule submodule = submoduleRepository.findById(submoduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("submodule not found: " + submoduleId));
+        submodule.setTitle(form.title());
+        submodule.setSortOrder(form.sortOrder());
+        submodule.setEstMinutes(form.estMinutes());
+        return submoduleRepository.save(submodule);
+    }
+
+    @Transactional
+    public void deleteSubmodule(UUID submoduleId) {
+        Submodule submodule = submoduleRepository.findById(submoduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("submodule not found: " + submoduleId));
+        List<Content> contents = contentRepository.findBySubmoduleIdOrderBySortOrder(submoduleId);
+        contentRepository.deleteAll(contents);
+        submoduleRepository.delete(submodule);
+    }
+
+    // ── Content update / delete ─────────────────────────────────────
+
+    @Transactional
+    public Content updateContent(UUID contentId, ContentForm form) {
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new ResourceNotFoundException("content not found: " + contentId));
+        content.setType(form.type());
+        content.setBody(form.body());
+        content.setS3Key(form.s3Key());
+        content.setLanguage(form.language());
+        content.setSortOrder(form.sortOrder());
+        return contentRepository.save(content);
+    }
+
+    @Transactional
+    public void deleteContent(UUID contentId) {
+        Content content = contentRepository.findById(contentId)
+                .orElseThrow(() -> new ResourceNotFoundException("content not found: " + contentId));
+        contentRepository.delete(content);
+    }
 }
+
