@@ -8,6 +8,11 @@ let state = {
   activeTab: 'authoring',
   evaluations: [], // DB evaluations history
   selectedSubmissionId: null,
+  // Batch Roster state
+  batches: [],
+  selectedBatchId: null,
+  batchLearners: [],
+  batchFeedback: [],
   submissions: [
     {
       resultId: 'a38b1d92-2a3b-4c4d-a2f0-e67c8b1d9201',
@@ -96,10 +101,11 @@ function showToast(message, type = 'success') {
 }
 
 // Local Storage for Trainer ID persistence
+// Default to the well-known mock trainer UUID used by BatchDataSeeder
 function getOrCreateTrainerId() {
   let id = localStorage.getItem('lms_trainer_id');
   if (!id) {
-    id = generateUUID();
+    id = '00000000-0000-4000-a000-000000000001';
     localStorage.setItem('lms_trainer_id', id);
   }
   return id;
@@ -139,6 +145,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('form-module').addEventListener('submit', handleCreateModule);
   document.getElementById('form-submodule').addEventListener('submit', handleCreateSubmodule);
   document.getElementById('form-content').addEventListener('submit', handleCreateContent);
+  document.getElementById('form-batch').addEventListener('submit', handleCreateBatch);
+  document.getElementById('form-add-learner').addEventListener('submit', handleAddLearner);
+  document.getElementById('form-add-feedback').addEventListener('submit', handleCreateFeedback);
   
   // Wire Content Type conditional inputs in add content form
   document.getElementById('content-type').addEventListener('change', handleContentTypeChange);
@@ -715,22 +724,32 @@ window.switchTab = function(tab) {
   
   const menuAuthoring = document.getElementById('menu-authoring');
   const menuEvaluations = document.getElementById('menu-evaluations');
+  const menuBatches = document.getElementById('menu-batches');
   const viewAuthoring = document.getElementById('view-authoring');
   const viewEvaluations = document.getElementById('view-evaluations');
+  const viewBatches = document.getElementById('view-batches');
+  
+  // Deactivate all
+  menuAuthoring.classList.remove('active');
+  menuEvaluations.classList.remove('active');
+  menuBatches.classList.remove('active');
+  viewAuthoring.style.display = 'none';
+  viewEvaluations.style.display = 'none';
+  viewBatches.style.display = 'none';
   
   if (tab === 'authoring') {
     menuAuthoring.classList.add('active');
-    menuEvaluations.classList.remove('active');
     viewAuthoring.style.display = 'flex';
-    viewEvaluations.style.display = 'none';
     loadCourses();
-  } else {
-    menuAuthoring.classList.remove('active');
+  } else if (tab === 'evaluations') {
     menuEvaluations.classList.add('active');
-    viewAuthoring.style.display = 'none';
     viewEvaluations.style.display = 'flex';
     loadEvaluations();
     renderRoster();
+  } else if (tab === 'batches') {
+    menuBatches.classList.add('active');
+    viewBatches.style.display = 'flex';
+    loadBatches();
   }
 };
 
@@ -1049,3 +1068,420 @@ window.deleteContent = async function(contentId) {
     showToast(error.message, 'error');
   }
 };
+
+// ═══════════════════════════════════════════════════════════════
+// BATCH ROSTER — API & Rendering
+// ═══════════════════════════════════════════════════════════════
+
+async function loadBatches() {
+  try {
+    const list = await fetchAPI('/api/v1/trainer/batches');
+    state.batches = list;
+    renderBatchesList();
+    
+    // Auto-select first batch if none is active and batches exist
+    if (!state.selectedBatchId && list.length > 0) {
+      selectBatch(list[0].batchId);
+    } else if (state.selectedBatchId) {
+      // Re-load learners for currently selected batch
+      loadBatchLearners(state.selectedBatchId);
+    }
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function loadBatchLearners(batchId) {
+  try {
+    const [learners, feedback] = await Promise.all([
+      fetchAPI(`/api/v1/trainer/batches/${batchId}/learners`),
+      fetchAPI(`/api/v1/trainer/batches/${batchId}/feedback`)
+    ]);
+    state.batchLearners = learners;
+    state.batchFeedback = feedback;
+    renderBatchWorkspace();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function selectBatch(batchId) {
+  state.selectedBatchId = batchId;
+  renderBatchesList();
+  loadBatchLearners(batchId);
+}
+
+
+async function handleCreateBatch(e) {
+  e.preventDefault();
+  const name = document.getElementById('batch-name').value.trim();
+  const startDateStr = document.getElementById('batch-start-date').value;
+  const endDateStr = document.getElementById('batch-end-date').value;
+  
+  if (!name || !startDateStr || !endDateStr) {
+    showToast('All fields are required', 'error');
+    return;
+  }
+  
+  try {
+    const newBatch = await fetchAPI('/api/v1/trainer/batches', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        startDate: new Date(startDateStr).toISOString(),
+        endDate: new Date(endDateStr).toISOString()
+      })
+    });
+    
+    showToast('Batch created successfully');
+    closeModal('modal-batch');
+    await loadBatches();
+    selectBatch(newBatch.batchId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function handleAddLearner(e) {
+  e.preventDefault();
+  const name = document.getElementById('learner-name-input').value.trim();
+  const email = document.getElementById('learner-email-input').value.trim();
+  
+  if (!name || !email) {
+    showToast('All fields are required', 'error');
+    return;
+  }
+  
+  try {
+    await fetchAPI(`/api/v1/trainer/batches/${state.selectedBatchId}/learners`, {
+      method: 'POST',
+      body: JSON.stringify({ name, email })
+    });
+    
+    showToast('Learner enrolled successfully');
+    closeModal('modal-add-learner');
+    loadBatchLearners(state.selectedBatchId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function exportRosterToCSV() {
+  const batch = state.batches.find(b => b.batchId === state.selectedBatchId);
+  if (!batch || state.batchLearners.length === 0) return;
+  
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Learner Name,Email,Joined Date\n";
+  
+  state.batchLearners.forEach(l => {
+    const joinedDate = l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '';
+    csvContent += `"${l.name.replace(/"/g, '""')}","${l.email.replace(/"/g, '""')}","${joinedDate}"\n`;
+  });
+  
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `${batch.name.replace(/\s+/g, '_')}_roster.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function getBatchStatus(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return { label: 'Unknown', class: 'badge-level' };
+  const now = new Date();
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  
+  if (now < start) {
+    return { label: 'Upcoming', class: 'badge-draft' };
+  } else if (now > end) {
+    return { label: 'Completed', class: 'badge-published' };
+  } else {
+    return { label: 'Active', class: 'badge-emerald' };
+  }
+}
+
+function renderBatchesList() {
+  const container = document.getElementById('batches-list');
+  container.innerHTML = '';
+  
+  if (state.batches.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:0.9rem">No batches assigned to you yet.</div>';
+    return;
+  }
+  
+  state.batches.forEach(batch => {
+    const isActive = batch.batchId === state.selectedBatchId;
+    const item = document.createElement('div');
+    item.className = `batch-item ${isActive ? 'active' : ''}`;
+    item.onclick = () => selectBatch(batch.batchId);
+    
+    const startDate = batch.startDate ? new Date(batch.startDate).toLocaleDateString() : '—';
+    const endDate = batch.endDate ? new Date(batch.endDate).toLocaleDateString() : '—';
+    
+    const status = getBatchStatus(batch.startDate, batch.endDate);
+    
+    item.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+        <div class="batch-item-title">${escapeHTML(batch.name)}</div>
+        <span class="badge ${status.class}" style="font-size: 0.6rem; padding: 2px 6px; flex-shrink: 0;">${status.label}</span>
+      </div>
+      <div class="batch-item-meta">
+        <span class="batch-date-range">${startDate} → ${endDate}</span>
+      </div>
+    `;
+    
+    container.appendChild(item);
+  });
+}
+
+function renderBatchWorkspace(filterText = '') {
+  const container = document.getElementById('batch-workspace');
+  container.innerHTML = '';
+  
+  const batch = state.batches.find(b => b.batchId === state.selectedBatchId);
+  if (!batch) {
+    container.innerHTML = `
+      <div class="placeholder-view">
+        <div class="placeholder-icon">👥</div>
+        <h3>No Batch Selected</h3>
+        <p>Choose a batch from the sidebar to view the learner roster.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const startDate = batch.startDate ? new Date(batch.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set';
+  const endDate = batch.endDate ? new Date(batch.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set';
+  const createdAt = batch.createdAt ? new Date(batch.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—';
+  
+  // Apply filtering
+  const query = filterText.toLowerCase().trim();
+  const filteredLearners = state.batchLearners.filter(l => 
+    l.name.toLowerCase().includes(query) || l.email.toLowerCase().includes(query)
+  );
+  
+  const learnerCount = state.batchLearners.length;
+  const filteredCount = filteredLearners.length;
+  
+  let html = `
+    <div style="max-width: 960px; margin: 0 auto;">
+      <!-- Batch Info Card -->
+      <div class="batch-info-card">
+        <div class="batch-info-header">
+          <div>
+            <span class="badge badge-emerald" style="margin-bottom: 8px; display: inline-block">Batch</span>
+            <h2>${escapeHTML(batch.name)}</h2>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center">
+            <button class="btn btn-secondary btn-sm" onclick="exportRosterToCSV()">📥 Export CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-learner')">+ Enroll Learner</button>
+          </div>
+        </div>
+        <div class="batch-stats">
+          <div class="batch-stat-item">
+            <span class="batch-stat-label">Batch ID</span>
+            <span class="batch-stat-value" style="font-family:var(--font-mono);font-size:0.8rem">${batch.batchId}</span>
+          </div>
+          <div class="batch-stat-item">
+            <span class="batch-stat-label">Start Date</span>
+            <span class="batch-stat-value">${startDate}</span>
+          </div>
+          <div class="batch-stat-item">
+            <span class="batch-stat-label">End Date</span>
+            <span class="batch-stat-value">${endDate}</span>
+          </div>
+          <div class="batch-stat-item">
+            <span class="batch-stat-label">Total Learners</span>
+            <span class="batch-stat-value" style="color:var(--emerald); font-weight:700;">${learnerCount}</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Learner Roster -->
+      <div class="learner-roster-section">
+        <div class="learner-roster-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <h3>Learner Roster</h3>
+            <span class="learner-count-badge">${filteredCount} displayed</span>
+          </div>
+          
+          <!-- Search Box -->
+          <div style="width: 250px;">
+            <input type="text" id="learner-search" class="form-control" placeholder="🔍 Search learners..." 
+                   value="${escapeHTML(filterText)}" oninput="renderBatchWorkspace(this.value)" 
+                   style="padding: 6px 12px; font-size: 0.85rem;">
+          </div>
+        </div>
+  `;
+  
+  if (learnerCount === 0) {
+    html += `
+        <div class="batch-empty-state">
+          <div class="empty-icon">📋</div>
+          <h3 style="margin-bottom: 8px">No Learners Yet</h3>
+          <p>This batch doesn't have any learners enrolled yet. Click "+ Enroll Learner" to get started.</p>
+        </div>
+    `;
+  } else if (filteredCount === 0) {
+    html += `
+        <div class="batch-empty-state">
+          <div class="empty-icon">🔍</div>
+          <h3 style="margin-bottom: 8px">No Matches Found</h3>
+          <p>No learners match the search query "${escapeHTML(filterText)}".</p>
+        </div>
+    `;
+  } else {
+    html += `
+        <table class="learner-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Learner</th>
+              <th>Email</th>
+              <th>Joined</th>
+              <th style="text-align: right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    filteredLearners.forEach((learner, idx) => {
+      const initials = getInitials(learner.name);
+      const joinedDate = learner.createdAt 
+        ? new Date(learner.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        : '—';
+      
+      html += `
+            <tr>
+              <td style="color: var(--text-muted); font-weight: 600">${idx + 1}</td>
+              <td>
+                <div class="learner-identity">
+                  <div class="learner-avatar">${initials}</div>
+                  <span class="learner-name">${escapeHTML(learner.name)}</span>
+                </div>
+              </td>
+              <td><span class="learner-email">${escapeHTML(learner.email)}</span></td>
+              <td><span class="learner-date">${joinedDate}</span></td>
+              <td style="text-align: right">
+                <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; margin-right: 6px;" onclick="openAddFeedbackModal('${learner.learnerId}', '${escapeHTML(learner.name).replace(/'/g, "\\'")}')">✍️ Feedback</button>
+                <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="removeLearnerFromBatch('${batch.batchId}', '${learner.learnerId}', '${escapeHTML(learner.name).replace(/'/g, "\\'")}')">🗑️ Remove</button>
+              </td>
+            </tr>
+      `;
+    });
+    
+    html += `
+          </tbody>
+        </table>
+    `;
+  }
+  
+  // Feedback Logs section
+  let feedbackLogsHtml = `
+    <div style="margin-top: 32px;">
+      <h3 style="border-bottom:1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px;">Qualitative Feedback History</h3>
+  `;
+  
+  if (state.batchFeedback.length === 0) {
+    feedbackLogsHtml += `
+      <div style="color:var(--text-muted); font-size:0.85rem; padding: 20px; background: rgba(255,255,255,0.01); border:1px solid var(--border-color); border-radius: var(--radius-md);">
+        No qualitative feedbacks recorded yet for this batch. Click "✍️ Feedback" next to a student to save notes.
+      </div>
+    `;
+  } else {
+    state.batchFeedback.forEach(f => {
+      // Find learner name
+      const lObj = state.batchLearners.find(l => l.learnerId === f.learnerId);
+      const name = lObj ? lObj.name : 'Unknown Student';
+      const initials = getInitials(name);
+      const dateStr = f.createdAt ? new Date(f.createdAt).toLocaleString() : '—';
+      
+      feedbackLogsHtml += `
+        <div class="feedback-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-muted);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="learner-avatar" style="width: 24px; height: 24px; font-size: 0.6rem;">${initials}</div>
+              <strong style="color: var(--text-main);">${escapeHTML(name)}</strong>
+            </div>
+            <span>${dateStr}</span>
+          </div>
+          <div style="font-size: 0.9rem; line-height: 1.5; color: var(--text-main); white-space: pre-wrap; padding-left: 32px;">${escapeHTML(f.notes)}</div>
+        </div>
+      `;
+    });
+  }
+  
+  feedbackLogsHtml += `</div>`;
+  
+  html += `
+        ${feedbackLogsHtml}
+      </div>
+    </div>
+  `;
+  
+  container.innerHTML = html;
+  
+  // Focus the search input and place cursor at end if it was active
+  const searchInput = document.getElementById('learner-search');
+  if (searchInput && filterText !== '') {
+    searchInput.focus();
+    searchInput.setSelectionRange(filterText.length, filterText.length);
+  }
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+window.openAddFeedbackModal = function(learnerId, learnerName) {
+  document.getElementById('feedback-target-learner-id').value = learnerId;
+  document.getElementById('feedback-learner-label').textContent = `Feedback Notes for ${learnerName}`;
+  document.getElementById('feedback-notes-input').value = '';
+  openModal('modal-add-feedback');
+};
+
+async function handleCreateFeedback(e) {
+  e.preventDefault();
+  const learnerId = document.getElementById('feedback-target-learner-id').value;
+  const notes = document.getElementById('feedback-notes-input').value.trim();
+  
+  if (!notes) {
+    showToast('Feedback notes cannot be empty', 'error');
+    return;
+  }
+  
+  try {
+    await fetchAPI(`/api/v1/trainer/batches/${state.selectedBatchId}/learners/${learnerId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+    
+    showToast('Feedback saved successfully');
+    closeModal('modal-add-feedback');
+    loadBatchLearners(state.selectedBatchId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+window.removeLearnerFromBatch = async function(batchId, learnerId, learnerName) {
+  if (!confirm(`Are you sure you want to remove ${learnerName} from this batch?`)) {
+    return;
+  }
+  
+  try {
+    await fetchAPI(`/api/v1/trainer/batches/${batchId}/learners/${learnerId}`, {
+      method: 'DELETE'
+    });
+    showToast('Learner removed successfully');
+    loadBatchLearners(batchId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+};
+

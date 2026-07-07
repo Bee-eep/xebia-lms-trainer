@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
   <link rel="stylesheet" href="app.css">
   <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
 </head>
+
 <body>
 
   <!-- App Header -->
@@ -16,40 +18,38 @@
       <h1>LMS Trainer Console</h1>
       <span class="badge badge-draft" style="font-size: 0.65rem; border-radius: 4px; padding: 2px 6px">Phase 1</span>
     </div>
-    
+
     <div class="trainer-identity">
       <label for="trainer-id-input">Trainer Context ID:</label>
-      <input type="text" id="trainer-id-input" placeholder="Loading UUID..." title="This ID scopes course creation. Edit to change trainers.">
+      <input type="text" id="trainer-id-input" placeholder="Loading UUID..."
+        title="This ID scopes course creation. Edit to change trainers.">
     </div>
   </header>
 
   <!-- Workspace Layout -->
   <div class="workspace">
-    
+
     <!-- Main Left Navigation Sidebar -->
     <div class="main-nav">
       <div id="menu-authoring" class="nav-item active" onclick="switchTab('authoring')">
-        <span style="font-size: 1.1rem">📚</span>
         <span>Course Authoring</span>
       </div>
       <div id="menu-evaluations" class="nav-item" onclick="switchTab('evaluations')">
-        <span style="font-size: 1.1rem">📝</span>
         <span>AI Evaluations</span>
       </div>
-      <div class="nav-item disabled" title="Coming soon: assigned batches and rosters">
-        <span style="font-size: 1.1rem">👥</span>
+      <div id="menu-batches" class="nav-item" onclick="switchTab('batches')">
         <span>Batch Roster</span>
       </div>
-      <div class="nav-item disabled" title="Coming soon: tasks and student tickets">
+      <!-- <div class="nav-item disabled" title="Coming soon: tasks and student tickets">
         <span style="font-size: 1.1rem">🎫</span>
         <span>Tasks & Tickets</span>
       </div>
       <div class="nav-item disabled" title="Coming soon: calendar bookings and reminders">
         <span style="font-size: 1.1rem">📅</span>
         <span>Schedule View</span>
-      </div>
+      </div> -->
     </div>
-    
+
     <!-- VIEW: COURSE AUTHORING -->
     <div id="view-authoring">
       <!-- Sidebar -->
@@ -62,7 +62,7 @@
           <!-- Dynamically loaded -->
         </div>
       </div>
-      
+
       <!-- Main Content Area -->
       <div id="workspace-content" class="content-area">
         <!-- Dynamically loaded course detail or placeholder -->
@@ -96,7 +96,31 @@
         </div>
       </div>
     </div>
-    
+
+    <!-- VIEW: BATCH ROSTER -->
+    <div id="view-batches" style="display: none;">
+      <!-- Sidebar: Batch List -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h2>My Batches</h2>
+          <button id="btn-new-batch" class="btn btn-primary btn-sm" onclick="openModal('modal-batch')">+ New
+            Batch</button>
+        </div>
+        <div id="batches-list" class="batches-list">
+          <!-- Dynamically loaded batches -->
+        </div>
+      </div>
+
+      <!-- Main Content: Learner Roster -->
+      <div id="batch-workspace" class="content-area">
+        <div class="placeholder-view">
+          <div class="placeholder-icon">👥</div>
+          <h3>No Batch Selected</h3>
+          <p>Choose a batch from the sidebar to view the learner roster.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- MODAL: CREATE COURSE -->
@@ -110,11 +134,13 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="course-title">Course Title</label>
-            <input type="text" id="course-title" class="form-control" placeholder="e.g. Introduction to Spring Boot" required maxlength="160">
+            <input type="text" id="course-title" class="form-control" placeholder="e.g. Introduction to Spring Boot"
+              required maxlength="160">
           </div>
           <div class="form-group">
             <label for="course-summary-input">Summary / Description</label>
-            <textarea id="course-summary-input" class="form-control" placeholder="Brief outline of the course objectives..."></textarea>
+            <textarea id="course-summary-input" class="form-control"
+              placeholder="Brief outline of the course objectives..."></textarea>
           </div>
           <div class="form-group">
             <label for="course-level">Course Difficulty Level</label>
@@ -144,11 +170,13 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="edit-course-title">Course Title</label>
-            <input type="text" id="edit-course-title" class="form-control" placeholder="e.g. Introduction to Spring Boot" required maxlength="160">
+            <input type="text" id="edit-course-title" class="form-control"
+              placeholder="e.g. Introduction to Spring Boot" required maxlength="160">
           </div>
           <div class="form-group">
             <label for="edit-course-summary-input">Summary / Description</label>
-            <textarea id="edit-course-summary-input" class="form-control" placeholder="Brief outline of the course objectives..."></textarea>
+            <textarea id="edit-course-summary-input" class="form-control"
+              placeholder="Brief outline of the course objectives..."></textarea>
           </div>
           <div class="form-group">
             <label for="edit-course-level">Course Difficulty Level</label>
@@ -178,7 +206,8 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="module-title-input">Section Title</label>
-            <input type="text" id="module-title-input" class="form-control" placeholder="e.g. Week 1: Environment Setup" required maxlength="160">
+            <input type="text" id="module-title-input" class="form-control" placeholder="e.g. Week 1: Environment Setup"
+              required maxlength="160">
           </div>
           <div class="form-group">
             <label for="module-sort">Sort Order</label>
@@ -205,7 +234,8 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="submodule-title-input">Lesson Title</label>
-            <input type="text" id="submodule-title-input" class="form-control" placeholder="e.g. Lesson 1.1: Setting up Java JDK" required maxlength="160">
+            <input type="text" id="submodule-title-input" class="form-control"
+              placeholder="e.g. Lesson 1.1: Setting up Java JDK" required maxlength="160">
           </div>
           <div class="form-group">
             <label for="submodule-est">Estimated Duration (Minutes)</label>
@@ -234,7 +264,7 @@
       <form id="form-content">
         <input type="hidden" id="target-submodule-id">
         <input type="hidden" id="resolved-s3-key">
-        
+
         <div class="modal-body">
           <div class="form-group">
             <label for="content-type">Content Block Type</label>
@@ -246,7 +276,7 @@
               <option value="VIDEO">Video Media</option>
             </select>
           </div>
-          
+
           <div class="form-group">
             <label for="content-sort">Sort Order</label>
             <input type="number" id="content-sort" class="form-control" value="1" min="1" required>
@@ -255,23 +285,25 @@
           <!-- Dynamic Text / Code Block Body -->
           <div id="group-body" class="form-group">
             <label for="content-body">Content Body</label>
-            <textarea id="content-body" class="form-control" placeholder="Write markdown content or paste code here..."></textarea>
+            <textarea id="content-body" class="form-control"
+              placeholder="Write markdown content or paste code here..."></textarea>
           </div>
 
           <!-- Dynamic Code Language -->
           <div id="group-language" class="form-group" style="display: none;">
             <label for="content-language">Programming Language</label>
-            <input type="text" id="content-language" class="form-control" placeholder="e.g. java, python, javascript, sql">
+            <input type="text" id="content-language" class="form-control"
+              placeholder="e.g. java, python, javascript, sql">
           </div>
 
           <!-- Dynamic Media upload / S3 Key -->
           <div id="group-media" class="form-group" style="display: none;">
             <label>Upload Media File (Direct-to-S3)</label>
-            
+
             <div id="media-upload-wrapper" class="file-upload-wrapper">
               <div id="media-info" class="file-upload-text">Drop file here or click to browse</div>
               <input type="file" id="media-file" class="file-upload-input">
-              
+
               <!-- Progress Bar -->
               <div id="media-progress" class="upload-progress-bar">
                 <div id="media-progress-fill" class="upload-progress-fill"></div>
@@ -281,15 +313,101 @@
             <!-- Fallback Mock S3 Key Entry -->
             <div id="media-fallback" class="fallback-box">
               <strong>S3 Upload Fallback Mode:</strong>
-              <p style="margin-top: 4px; margin-bottom: 8px;">A mock S3 key has been auto-generated. You can also specify a custom key manually below:</p>
-              <input type="text" id="manual-s3-key" class="form-control" placeholder="e.g. content/my-file-uuid.png" style="font-family:var(--font-mono);font-size:0.8rem">
+              <p style="margin-top: 4px; margin-bottom: 8px;">A mock S3 key has been auto-generated. You can also
+                specify a custom key manually below:</p>
+              <input type="text" id="manual-s3-key" class="form-control" placeholder="e.g. content/my-file-uuid.png"
+                style="font-family:var(--font-mono);font-size:0.8rem">
             </div>
           </div>
         </div>
-        
+
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-content')">Cancel</button>
           <button type="submit" class="btn btn-primary">Add Block</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE BATCH -->
+  <div id="modal-batch" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Create New Batch</h3>
+        <button class="modal-close" onclick="closeModal('modal-batch')">&times;</button>
+      </div>
+      <form id="form-batch">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="batch-name">Batch Name</label>
+            <input type="text" id="batch-name" class="form-control" placeholder="e.g. Spring Boot Cohort 8" required
+              maxlength="160">
+          </div>
+          <div class="form-group">
+            <label for="batch-start-date">Start Date</label>
+            <input type="date" id="batch-start-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="batch-end-date">End Date</label>
+            <input type="date" id="batch-end-date" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-batch')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Batch</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD LEARNER -->
+  <div id="modal-add-learner" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Enroll New Learner</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-learner')">&times;</button>
+      </div>
+      <form id="form-add-learner">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="learner-name-input">Full Name</label>
+            <input type="text" id="learner-name-input" class="form-control" placeholder="e.g. John Doe" required
+              maxlength="160">
+          </div>
+          <div class="form-group">
+            <label for="learner-email-input">Email Address</label>
+            <input type="email" id="learner-email-input" class="form-control" placeholder="e.g. john.doe@xebia.com"
+              required maxlength="255">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-learner')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Enroll Learner</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD FEEDBACK -->
+  <div id="modal-add-feedback" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Qualitative Feedback</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-feedback')">&times;</button>
+      </div>
+      <form id="form-add-feedback">
+        <input type="hidden" id="feedback-target-learner-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label id="feedback-learner-label">Feedback Notes for Learner</label>
+            <textarea id="feedback-notes-input" class="form-control"
+              placeholder="Write feedback notes, qualitative evaluations, highlights or warnings..." required
+              rows="4"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-feedback')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Feedback</button>
         </div>
       </form>
     </div>
@@ -301,4 +419,5 @@
   <!-- App Javascript -->
   <script src="app.js"></script>
 </body>
+
 </html>
