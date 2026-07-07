@@ -3,7 +3,13 @@
  */
 package com.xebia.lms.trainer.authoring.controller;
 
-import com.xebia.lms.trainer.authoring.dto.*;
+import com.xebia.lms.trainer.authoring.dto.content.ContentForm;
+import com.xebia.lms.trainer.authoring.dto.content.ContentResponse;
+import com.xebia.lms.trainer.authoring.dto.content.PresignedUploadResponse;
+import com.xebia.lms.trainer.authoring.dto.module.ModuleForm;
+import com.xebia.lms.trainer.authoring.dto.module.ModuleResponse;
+import com.xebia.lms.trainer.authoring.dto.submodule.SubmoduleForm;
+import com.xebia.lms.trainer.authoring.dto.submodule.SubmoduleResponse;
 import com.xebia.lms.trainer.authoring.model.Content;
 import com.xebia.lms.trainer.authoring.model.CourseModule;
 import com.xebia.lms.trainer.authoring.model.Submodule;

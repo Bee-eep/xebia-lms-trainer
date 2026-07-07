@@ -18,9 +18,120 @@ Welcome to the **LMS Trainer Service** repository. This Spring Boot service hand
 
 ---
 
+## Project Directory Structure
+
+```
+xebia-lms-trainer/
+├── .env.example                       # Safe credential template (copy to .env)
+├── .gitignore
+├── DB_SETUP.md
+├── README.md
+├── pom.xml                            # Maven build config (Java 21, Spring Boot 3.3.4)
+├── mvnw / mvnw.cmd / .mvn/           # Maven wrapper
+│
+└── src/
+    ├── main/
+    │   ├── java/com/xebia/lms/trainer/
+    │   │   ├── TrainerApplication.java           # Spring Boot entry point
+    │   │   │
+    │   │   ├── authoring/                        # ── Course Authoring Domain ──
+    │   │   │   ├── controller/
+    │   │   │   │   ├── ContentController.java    #   Module/Submodule/Content + media presign routes
+    │   │   │   │   └── CourseController.java     #   Course CRUD + publish routes
+    │   │   │   ├── dto/
+    │   │   │   │   ├── course/                   #   CourseForm, CourseResponse, CourseDetailResponse
+    │   │   │   │   ├── module/                   #   ModuleForm, ModuleResponse, ModuleDetailResponse
+    │   │   │   │   ├── submodule/                #   SubmoduleForm, SubmoduleResponse, SubmoduleDetailResponse
+    │   │   │   │   └── content/                  #   ContentForm, ContentResponse, ContentDetailResponse,
+    │   │   │   │                                 #   PresignedUploadResponse
+    │   │   │   ├── model/                        #   JPA entities: Course, CourseModule, Submodule,
+    │   │   │   │                                 #   Content, ContentType, CourseLevel, CourseStatus
+    │   │   │   ├── repository/                   #   Spring Data JPA repositories
+    │   │   │   └── service/
+    │   │   │       ├── AuthoringService.java     #   Course lifecycle (create → build → publish)
+    │   │   │       └── ContentMediaService.java  #   S3 presigned URL generation
+    │   │   │
+    │   │   ├── evaluation/                       # ── Evaluation Domain ──
+    │   │   │   ├── controller/
+    │   │   │   │   └── EvaluationController.java #   Trainer grade override routes
+    │   │   │   ├── dto/
+    │   │   │   │   ├── EvaluationForm.java       #   Override submission payload
+    │   │   │   │   └── EvaluationResponse.java   #   Override response payload
+    │   │   │   ├── model/
+    │   │   │   │   └── TrainerEvaluation.java    #   JPA entity for trainer_evaluation table
+    │   │   │   ├── repository/
+    │   │   │   │   └── EvaluationRepository.java
+    │   │   │   └── service/
+    │   │   │       └── EvaluationService.java
+    │   │   │
+    │   │   ├── common/                           # ── Shared Infrastructure ──
+    │   │   │   ├── event/
+    │   │   │   │   └── CoursePublishedEvent.java  #   Domain event fired on publish
+    │   │   │   └── exception/
+    │   │   │       ├── GlobalExceptionHandler.java
+    │   │   │       ├── InvalidCourseStateException.java
+    │   │   │       └── ResourceNotFoundException.java
+    │   │   │
+    │   │   └── config/                           # ── Configuration ──
+    │   │       ├── S3Config.java                 #   AWS S3 presigner bean
+    │   │       └── SecurityConfig.java           #   Phase-1 security chain (open, stateless)
+    │   │
+    │   └── resources/
+    │       ├── application.yml                   # Shared config (app name, port, S3)
+    │       ├── application-dev.yml               # Dev profile: embedded H2, ddl-auto: update
+    │       ├── application-prod.yml              # Prod profile: PostgreSQL, Flyway, ddl-auto: validate
+    │       ├── certs/                            # TLS certificates (placeholder)
+    │       ├── db/migration/                     # Flyway SQL migrations
+    │       │   ├── V1__init_course_schema.sql
+    │       │   └── V2__create_evaluation_schema.sql
+    │       └── static/                           # Frontend SPA
+    │           ├── index.html
+    │           ├── app.js
+    │           └── app.css
+    │
+    └── test/
+        └── java/com/xebia/lms/trainer/          # Test root (mirrors main structure)
+```
+
+### Package Design Rationale
+
+The Java source follows a **domain-driven package layout**:
+
+| Package | Responsibility |
+|---------|---------------|
+| `authoring` | Course creation, module/submodule/content management, media uploads, publishing |
+| `evaluation` | Trainer-side grade overrides of AI-scored learner submissions |
+| `common` | Cross-cutting concerns: domain events, global exception handling |
+| `config` | Spring `@Configuration` beans (security, S3 presigner) |
+
+DTOs are further grouped by **domain concept** (`dto/course/`, `dto/module/`, `dto/submodule/`, `dto/content/`) to keep the authoring package navigable as it grows.
+
+---
+
 ## 1. Setup & Environment Configurations
 
-The application reads database connection settings directly from a `.env` file in the project root. Spring Boot automatically imports this file at startup via `spring.config.import`.
+The application supports two Spring profiles:
+
+| Profile | Database | Use Case |
+|---------|----------|----------|
+| `dev` | Embedded H2 (PostgreSQL mode) | Local development, no external DB needed |
+| `prod` | PostgreSQL via env vars | Staging / production deployments |
+
+### Quick Start (Dev — H2)
+
+No `.env` file needed. Just run with the `dev` profile:
+
+```bash
+# macOS / Linux
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+
+# Windows
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+The H2 console is available at `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:file:./data/lms_trainer`).
+
+### Production Setup (PostgreSQL)
 
 1. Copy the `.env.example` file to create your `.env` file:
    ```bash
@@ -36,20 +147,14 @@ The application reads database connection settings directly from a `.env` file i
    > [!IMPORTANT]
    > Do NOT commit the `.env` file containing database credentials to version control. It is ignored by Git.
 
+3. Run with the `prod` profile:
+   ```bash
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=prod
+   ```
+
 ---
 
 ## 2. Running the Application
-
-Since `.env` is loaded automatically by Spring Boot, you can run the server with a simple command:
-
-* **Windows:**
-  ```cmd
-  .\mvnw.cmd spring-boot:run
-  ```
-* **macOS / Linux:**
-  ```bash
-  ./mvnw spring-boot:run
-  ```
 
 Once the terminal prints `Started TrainerApplication`, open your web browser and navigate to:
 ```url
@@ -84,7 +189,7 @@ The web interface is structured into a dashboard with a **Left Navigation Sideba
 
 ## 4. API Endpoints Reference
 
-### Course Authoring (`CourseController.java`)
+### Course Authoring (`authoring/controller/CourseController.java`)
 * `GET /api/v1/trainer/courses` — List all courses.
 * `GET /api/v1/trainer/courses/{id}` — Retrieve full nested detail hierarchy tree of a course.
 * `POST /api/v1/trainer/courses` — Create a new `DRAFT` course.
@@ -92,16 +197,18 @@ The web interface is structured into a dashboard with a **Left Navigation Sideba
 * `DELETE /api/v1/trainer/courses/{id}` — Delete a draft course and its modules cascade-style.
 * `POST /api/v1/trainer/courses/{id}/publish` — Publish course (status -> `PUBLISHED`, version -> locked).
 
-### Course Modules (`ModuleController.java`)
+### Content & Modules (`authoring/controller/ContentController.java`)
 * `POST /api/v1/trainer/courses/{courseId}/modules` — Add module.
-
-### Submodules / Lessons (`SubmoduleController.java`)
+* `PUT /api/v1/trainer/modules/{id}` — Update module.
+* `DELETE /api/v1/trainer/modules/{id}` — Delete module.
 * `POST /api/v1/trainer/modules/{moduleId}/submodules` — Add submodule.
-
-### Content Blocks (`ContentController.java`)
+* `PUT /api/v1/trainer/submodules/{id}` — Update submodule.
+* `DELETE /api/v1/trainer/submodules/{id}` — Delete submodule.
 * `POST /api/v1/trainer/submodules/{submoduleId}/content` — Add content block.
+* `PUT /api/v1/trainer/content/{id}` — Update content block.
+* `DELETE /api/v1/trainer/content/{id}` — Delete content block.
 * `POST /api/v1/trainer/content/media/presign` — Generate presigned S3 PUT URL for files.
 
-### AI Evaluations (`EvaluationController.java`)
+### AI Evaluations (`evaluation/controller/EvaluationController.java`)
 * `GET /api/v1/trainer/evaluations` — Retrieve all saved grade overrides.
 * `POST /api/v1/trainer/evaluations` — Review and save a trainer score override.

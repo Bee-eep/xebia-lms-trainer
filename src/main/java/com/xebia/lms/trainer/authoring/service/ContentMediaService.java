@@ -3,7 +3,7 @@
  */
 package com.xebia.lms.trainer.authoring.service;
 
-import com.xebia.lms.trainer.authoring.dto.PresignedUploadResponse;
+import com.xebia.lms.trainer.authoring.dto.content.PresignedUploadResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;

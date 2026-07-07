@@ -3,7 +3,14 @@
  */
 package com.xebia.lms.trainer.authoring.service;
 
-import com.xebia.lms.trainer.authoring.dto.*;
+import com.xebia.lms.trainer.authoring.dto.content.ContentDetailResponse;
+import com.xebia.lms.trainer.authoring.dto.content.ContentForm;
+import com.xebia.lms.trainer.authoring.dto.course.CourseDetailResponse;
+import com.xebia.lms.trainer.authoring.dto.course.CourseForm;
+import com.xebia.lms.trainer.authoring.dto.module.ModuleDetailResponse;
+import com.xebia.lms.trainer.authoring.dto.module.ModuleForm;
+import com.xebia.lms.trainer.authoring.dto.submodule.SubmoduleDetailResponse;
+import com.xebia.lms.trainer.authoring.dto.submodule.SubmoduleForm;
 import java.util.List;
 import com.xebia.lms.trainer.authoring.model.Content;
 import com.xebia.lms.trainer.authoring.model.Course;

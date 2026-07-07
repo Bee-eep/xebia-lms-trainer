@@ -36,3 +36,8 @@ dist/
 ### Logs & Ops ###
 *.log
 .env
+
+### Runtime Data ###
+data/
+*.mv.db
+*.trace.db
