@@ -4,14 +4,50 @@
 package com.xebia.lms.trainer.authoring.model;
 
 /**
- * ContentType - the kind of content block a submodule can contain.
- * TEXT and CODE store their payload in the `body` column; IMAGE, PDF and
- * VIDEO store an S3 key instead and are served via presigned URL.
+ * ContentType - Supported content blocks for the Content Editor.
+ *
+ * HEADING        -> body + headingLevel
+ * TEXT           -> body
+ * BULLETS        -> data (JSON array)
+ * ARROW_LIST     -> data (JSON array)
+ * NUMBERED_LIST  -> data (JSON array)
+ * QUOTE          -> body
+ * CODE           -> body + language
+ * IMAGE          -> s3Key
+ * VIDEO          -> s3Key
+ * LINK           -> url + optional body
+ * TABLE          -> data (JSON)
+ * COMPARISON     -> data (JSON)
+ * CALLOUT        -> body
+ * DIVIDER        -> no payload
  */
 public enum ContentType {
+
+    HEADING,
+
     TEXT,
+
+    BULLETS,
+
+    ARROW_LIST,
+
+    NUMBERED_LIST,
+
+    QUOTE,
+
     CODE,
+
     IMAGE,
-    PDF,
-    VIDEO
+
+    VIDEO,
+
+    LINK,
+
+    TABLE,
+
+    COMPARISON,
+
+    CALLOUT,
+
+    DIVIDER
 }

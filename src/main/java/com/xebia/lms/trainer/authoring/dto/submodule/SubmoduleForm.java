@@ -8,9 +8,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 /**
- * SubmoduleForm - what a trainer submits to add a lesson to a module.
- * estMinutes is optional; a trainer may add it later once the lesson's
- * content is fleshed out.
+ * SubmoduleForm - request payload for creating or updating a submodule.
  */
 public record SubmoduleForm(
 
@@ -19,8 +17,9 @@ public record SubmoduleForm(
         String title,
 
         @PositiveOrZero(message = "sortOrder must be zero or positive")
-        int sortOrder,
+        Integer sortOrder,
 
+        @PositiveOrZero(message = "estMinutes must be zero or positive")
         Integer estMinutes
 ) {
 }

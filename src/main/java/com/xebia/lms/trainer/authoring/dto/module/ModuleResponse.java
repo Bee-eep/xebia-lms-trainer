@@ -8,23 +8,22 @@ import com.xebia.lms.trainer.authoring.model.CourseModule;
 import java.util.UUID;
 
 /**
- * ModuleResponse - what the API returns after a module is added to a
- * course.
+ * ModuleResponse - API response for a module.
  */
 public record ModuleResponse(
         UUID moduleId,
         UUID courseId,
         String title,
-        int sortOrder
+        Integer sortOrder
 ) {
 
     /**
-     * from - maps a CourseModule entity to its API-facing representation.
+     * Maps CourseModule entity to ModuleResponse.
      */
     public static ModuleResponse from(CourseModule module) {
         return new ModuleResponse(
                 module.getModuleId(),
-                module.getCourseId(),
+                module.getCourse().getCourseId(),
                 module.getTitle(),
                 module.getSortOrder()
         );

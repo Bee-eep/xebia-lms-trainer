@@ -11,9 +11,8 @@ import lombok.Setter;
 import java.util.UUID;
 
 /**
- * Content - a single block inside a submodule (text, code, image, PDF or
- * video). Maps 1:1 to the `content` table. TEXT/CODE blocks use `body`;
- * IMAGE/PDF/VIDEO blocks use `s3Key` and are streamed via a presigned URL.
+ * Content - a single ordered block belonging to a Submodule.
+ * Multiple Content rows together form a complete content page.
  */
 @Entity
 @Table(name = "content")
@@ -27,22 +26,37 @@ public class Content {
     @Column(name = "content_id")
     private UUID contentId;
 
-    @Column(name = "submodule_id", nullable = false)
-    private UUID submoduleId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "submodule_id", nullable = false)
+    private Submodule submodule;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 12)
+    @Column(nullable = false, length = 30)
     private ContentType type;
 
-    @Column(columnDefinition = "text")
+    @Column(name = "heading_level", length = 4)
+    private String headingLevel;
+
+    @Column(columnDefinition = "TEXT")
     private String body;
 
     @Column(name = "s3_key", length = 255)
     private String s3Key;
 
+    @Column(length = 500)
+    private String url;
+
     @Column(length = 24)
     private String language;
 
+    /**
+     * Stores JSON data for complex block types like:
+     * BULLETS, NUMBERED_LIST, ARROW_LIST,
+     * TABLE, COMPARISON, etc.
+     */
+    @Column(columnDefinition = "TEXT")
+    private String data;
+
     @Column(name = "sort_order", nullable = false)
-    private int sortOrder;
+    private Integer sortOrder = 0;
 }

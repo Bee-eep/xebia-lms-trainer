@@ -13,9 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Course - a course owned and authored by a trainer.
- *
- * Hierarchy:
+ * Category - Top level entity in the authoring hierarchy.
  * Category
  *   └── Course
  *        └── Module
@@ -23,49 +21,40 @@ import java.util.UUID;
  *                  └── Content
  */
 @Entity
-@Table(name = "course")
+@Table(name = "category")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Course {
+public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "course_id")
-    private UUID courseId;
+    @Column(name = "category_id")
+    private UUID categoryId;
 
-    @Column(name = "trainer_id", nullable = false)
-    private UUID trainerId;
+    @Column(nullable = false, length = 120, unique = true)
+    private String name;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    private Category category;
+    @Column(length = 64)
+    private String icon;
 
-    @Column(nullable = false, length = 160)
-    private String title;
+    @Column(length = 16)
+    private String color;
 
     @Column(columnDefinition = "TEXT")
-    private String summary;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private CourseLevel level;
+    private String description;
 
     @Column(nullable = false)
-    private int version = 1;
+    private boolean active = true;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private CourseStatus status = CourseStatus.DRAFT;
-
-    @OneToMany(mappedBy = "course",
+    @OneToMany(mappedBy = "category",
             cascade = CascadeType.ALL,
             orphanRemoval = true,
             fetch = FetchType.LAZY)
-    private List<CourseModule> modules;
+    private List<Course> courses;
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    private Instant createdAt = Instant.now();
 
     @Column(name = "updated_at")
     private Instant updatedAt;

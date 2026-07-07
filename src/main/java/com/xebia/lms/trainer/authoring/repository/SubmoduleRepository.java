@@ -3,6 +3,7 @@
  */
 package com.xebia.lms.trainer.authoring.repository;
 
+import com.xebia.lms.trainer.authoring.model.CourseModule;
 import com.xebia.lms.trainer.authoring.model.Submodule;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -15,8 +16,22 @@ import java.util.UUID;
 public interface SubmoduleRepository extends JpaRepository<Submodule, UUID> {
 
     /**
-     * findByModuleIdOrderBySortOrder - returns a module's lessons already
-     * sorted for display.
+     * Returns all submodules of a module ordered by sort order.
      */
-    List<Submodule> findByModuleIdOrderBySortOrder(UUID moduleId);
+    List<Submodule> findByModuleOrderBySortOrder(CourseModule module);
+
+    /**
+     * Returns all submodules of a module ordered by sort order.
+     */
+    List<Submodule> findByModule_ModuleIdOrderBySortOrder(UUID moduleId);
+
+    /**
+     * Checks whether a module contains any submodules.
+     */
+    boolean existsByModule_ModuleId(UUID moduleId);
+
+    /**
+     * Deletes all submodules belonging to a module.
+     */
+    void deleteByModule_ModuleId(UUID moduleId);
 }

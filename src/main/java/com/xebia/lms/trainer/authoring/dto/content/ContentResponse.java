@@ -8,28 +8,35 @@ import com.xebia.lms.trainer.authoring.model.Content;
 import java.util.UUID;
 
 /**
- * ContentResponse - what the API returns after a content block is added
- * to a submodule.
+ * ContentResponse - API response for a content block.
  */
 public record ContentResponse(
         UUID contentId,
         UUID submoduleId,
         String type,
+        String headingLevel,
+        String body,
         String s3Key,
-        int sortOrder
+        String url,
+        String language,
+        String data,
+        Integer sortOrder
 ) {
 
     /**
-     * from - maps a Content entity to its API-facing representation. body
-     * is intentionally left out for large TEXT/CODE blocks in list views;
-     * this response is meant for "block created" acknowledgements.
+     * Maps Content entity to ContentResponse.
      */
     public static ContentResponse from(Content content) {
         return new ContentResponse(
                 content.getContentId(),
-                content.getSubmoduleId(),
+                content.getSubmodule().getSubmoduleId(),
                 content.getType().name(),
+                content.getHeadingLevel(),
+                content.getBody(),
                 content.getS3Key(),
+                content.getUrl(),
+                content.getLanguage(),
+                content.getData(),
                 content.getSortOrder()
         );
     }
