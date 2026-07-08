@@ -1,8 +1,10 @@
 // State Management
 let state = {
   courses: [],
+  categories: [],
   selectedCourseId: null,
   selectedCourseDetail: null,
+  selectedCategoryId: null,
   trainerId: getOrCreateTrainerId(),
   defaultDomainId: 'd6b5e672-0000-4000-a000-000000000001', // Mock default domain UUID
   activeTab: 'authoring',
@@ -139,7 +141,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Bind forms and buttons
-  document.getElementById('btn-new-course').addEventListener('click', () => openModal('modal-course'));
+  document.getElementById('btn-new-category').addEventListener('click', openCreateCategoryModal);
+  document.getElementById('btn-new-course').addEventListener('click', openCreateCourseModal);
+  document.getElementById('form-category').addEventListener('submit', handleCreateCategory);
   document.getElementById('form-course').addEventListener('submit', handleCreateCourse);
   document.getElementById('form-edit-course').addEventListener('submit', handleEditCourse);
   document.getElementById('form-module').addEventListener('submit', handleCreateModule);
@@ -151,17 +155,125 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Wire Content Type conditional inputs in add content form
   document.getElementById('content-type').addEventListener('change', handleContentTypeChange);
+  document.getElementById('content-heading-level').addEventListener('change', handleHeadingLevelChange);
   
   // Wire S3 File uploader
   setupFileUploader();
 
   // Load Initial Data
+  loadCategories();
   loadCourses();
 });
 
 function isValidUUID(uuid) {
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return regex.test(uuid);
+}
+
+function getCategoryById(categoryId) {
+  return state.categories.find(category => category.categoryId === categoryId) || null;
+}
+
+function getVisibleCourses() {
+  if (!state.selectedCategoryId) {
+    return state.courses;
+  }
+
+  return state.courses.filter(course => course.categoryId === state.selectedCategoryId);
+}
+
+function sanitizeCssColor(color) {
+  if (!color) return '';
+
+  const value = color.trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(value) || /^rgba?\([0-9\s.,%]+\)$/i.test(value) || /^hsla?\([0-9\s.,%]+\)$/i.test(value)) {
+    return value;
+  }
+
+  return '';
+}
+
+function renderCategorySelectOptions(selectedValue = '') {
+  if (state.categories.length === 0) {
+    return '<option value="" disabled selected>Create a category first</option>';
+  }
+
+  return state.categories.map(category => {
+    const isSelected = category.categoryId === selectedValue;
+    return `<option value="${category.categoryId}" ${isSelected ? 'selected' : ''}>${escapeHTML(category.name)}</option>`;
+  }).join('');
+}
+
+function populateCategorySelects() {
+  const courseSelect = document.getElementById('course-category');
+  const editSelect = document.getElementById('edit-course-category');
+
+  if (courseSelect) {
+    courseSelect.innerHTML = renderCategorySelectOptions(state.selectedCategoryId || courseSelect.value);
+    if (state.selectedCategoryId && state.categories.some(category => category.categoryId === state.selectedCategoryId)) {
+      courseSelect.value = state.selectedCategoryId;
+    }
+  }
+
+  if (editSelect) {
+    const currentDetailCategoryId = state.selectedCourseDetail?.categoryId || state.selectedCategoryId || '';
+    editSelect.innerHTML = renderCategorySelectOptions(currentDetailCategoryId);
+    if (currentDetailCategoryId) {
+      editSelect.value = currentDetailCategoryId;
+    }
+  }
+}
+
+function syncSelectedCourseWithCategory() {
+  const visibleCourses = getVisibleCourses();
+
+  if (visibleCourses.length === 0) {
+    state.selectedCourseId = null;
+    state.selectedCourseDetail = null;
+    renderCourseWorkspace();
+    return;
+  }
+
+  const activeCourse = visibleCourses.find(course => course.courseId === state.selectedCourseId);
+  if (!activeCourse) {
+    selectCourse(visibleCourses[0].courseId);
+    return;
+  }
+}
+
+function openCreateCategoryModal() {
+  const form = document.getElementById('form-category');
+  if (form) {
+    form.reset();
+    const colorInput = document.getElementById('category-color');
+    if (colorInput) {
+      colorInput.value = '#0f766e';
+    }
+  }
+
+  openModal('modal-category');
+}
+
+function openCreateCourseModal() {
+  populateCategorySelects();
+
+  const categorySelect = document.getElementById('course-category');
+  if (categorySelect && state.selectedCategoryId) {
+    categorySelect.value = state.selectedCategoryId;
+  }
+
+  openModal('modal-course');
+}
+
+function selectCategory(categoryId) {
+  state.selectedCategoryId = categoryId;
+  state.selectedCourseId = null;
+  state.selectedCourseDetail = null;
+
+  renderCategoriesList();
+  renderCoursesList();
+  populateCategorySelects();
+  syncSelectedCourseWithCategory();
 }
 
 // Modal Management
@@ -204,20 +316,38 @@ async function fetchAPI(url, options = {}) {
   }
   
   if (response.status === 204) return null;
-  return await response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 // Fetch lists of courses
+async function loadCategories() {
+  try {
+    const list = await fetchAPI('/api/v1/trainer/categories');
+    state.categories = list;
+
+    if (state.selectedCategoryId && !list.some(category => category.categoryId === state.selectedCategoryId)) {
+      state.selectedCategoryId = list.length > 0 ? list[0].categoryId : null;
+    }
+
+    if (!state.selectedCategoryId && list.length > 0) {
+      state.selectedCategoryId = list[0].categoryId;
+    }
+
+    renderCategoriesList();
+    populateCategorySelects();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
 async function loadCourses() {
   try {
     const list = await fetchAPI('/api/v1/trainer/courses');
     state.courses = list;
     renderCoursesList();
-    
-    // Select first course if none is active and courses exist
-    if (!state.selectedCourseId && list.length > 0) {
-      selectCourse(list[0].courseId);
-    }
+    populateCategorySelects();
+    syncSelectedCourseWithCategory();
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -228,6 +358,9 @@ async function loadCourseDetail(courseId) {
   try {
     const detail = await fetchAPI(`/api/v1/trainer/courses/${courseId}`);
     state.selectedCourseDetail = detail;
+    state.selectedCategoryId = detail.categoryId;
+    renderCategoriesList();
+    populateCategorySelects();
     renderCourseWorkspace();
   } catch (error) {
     showToast(error.message, 'error');
@@ -247,12 +380,18 @@ async function handleCreateCourse(e) {
   const title = document.getElementById('course-title').value.trim();
   const summary = document.getElementById('course-summary-input').value.trim();
   const level = document.getElementById('course-level').value;
+  const categoryId = document.getElementById('course-category').value;
+
+  if (!categoryId) {
+    showToast('Select a category before creating a course', 'error');
+    return;
+  }
   
   try {
     const newCourse = await fetchAPI('/api/v1/trainer/courses', {
       method: 'POST',
       body: JSON.stringify({
-        domainId: state.defaultDomainId,
+        categoryId,
         title,
         summary,
         level
@@ -263,6 +402,39 @@ async function handleCreateCourse(e) {
     closeModal('modal-course');
     await loadCourses();
     selectCourse(newCourse.courseId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function handleCreateCategory(e) {
+  e.preventDefault();
+
+  const name = document.getElementById('category-name').value.trim();
+  const icon = document.getElementById('category-icon').value.trim();
+  const color = document.getElementById('category-color').value.trim();
+  const description = document.getElementById('category-description').value.trim();
+
+  if (!name) {
+    showToast('Category name is required', 'error');
+    return;
+  }
+
+  try {
+    const category = await fetchAPI('/api/v1/trainer/categories', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        icon,
+        color,
+        description
+      })
+    });
+
+    showToast('Category created successfully');
+    closeModal('modal-category');
+    await loadCategories();
+    selectCategory(category.categoryId);
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -318,13 +490,18 @@ async function handleCreateSubmodule(e) {
 async function handleCreateContent(e) {
   e.preventDefault();
   const submoduleId = document.getElementById('target-submodule-id').value;
+  const contentId = document.getElementById('target-content-id').value;
   const type = document.getElementById('content-type').value;
   const body = document.getElementById('content-body').value.trim();
   const language = document.getElementById('content-language').value;
   const sortOrder = parseInt(document.getElementById('content-sort').value) || 1;
+  const headingLevel = document.getElementById('content-heading-level') ? document.getElementById('content-heading-level').value : '';
+  const headingText = document.getElementById('content-heading-text') ? document.getElementById('content-heading-text').value.trim() : '';
   
   // Resolve S3 key if media
+
   let s3Key = null;
+
   if (['IMAGE', 'PDF', 'VIDEO'].includes(type)) {
     // Read upload key (either S3 uploader resolved it, or the manual fallback input did)
     s3Key = document.getElementById('resolved-s3-key').value.trim();
@@ -335,18 +512,30 @@ async function handleCreateContent(e) {
   }
   
   try {
-    await fetchAPI(`/api/v1/trainer/submodules/${submoduleId}/content`, {
-      method: 'POST',
-      body: JSON.stringify({
+    const payload = {
         type,
-        body: ['TEXT', 'CODE'].includes(type) ? body : null,
+        body: ['TEXT', 'CODE', 'QUOTE', 'HEADING'].includes(type) ? body : null,
         s3Key,
         language: type === 'CODE' ? language : null,
+        headingLevel: headingLevel || null,
+        headingText: headingText || null,
         sortOrder
-      })
-    });
+    };
     
-    showToast('Content block added successfully');
+    if (contentId) {
+      await fetchAPI(`/api/v1/trainer/content/${contentId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      showToast('Content block updated successfully');
+    } else {
+      await fetchAPI(`/api/v1/trainer/submodules/${submoduleId}/content`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      showToast('Content block added successfully');
+    }
+    
     closeModal('modal-content');
     loadCourseDetail(state.selectedCourseId);
   } catch (error) {
@@ -372,23 +561,89 @@ async function publishActiveCourse() {
 
 // Rendering Logic
 
+function renderCategoriesList() {
+  const container = document.getElementById('categories-list');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (state.categories.length === 0) {
+    container.innerHTML = `
+      <div class="empty-stack">
+        <div class="empty-stack-icon">🏷️</div>
+        <div class="empty-stack-title">No categories yet</div>
+        <div class="empty-stack-copy">Create the first category to start building the hierarchy.</div>
+      </div>
+    `;
+    return;
+  }
+
+  state.categories.forEach(category => {
+    const isActive = category.categoryId === state.selectedCategoryId;
+    const courseCount = state.courses.filter(course => course.categoryId === category.categoryId).length;
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = `category-item ${isActive ? 'active' : ''}`;
+    item.onclick = () => selectCategory(category.categoryId);
+
+    const color = sanitizeCssColor(category.color);
+    const colorStyle = color ? `style="background:${color};"` : '';
+
+    // Prevent the click on the delete button from selecting the category
+    item.innerHTML = `
+      <div class="category-item-top">
+        <div class="category-icon" ${colorStyle}>${escapeHTML(category.icon || '📚')}</div>
+        <div class="category-item-copy">
+          <div class="category-item-title">${escapeHTML(category.name)}</div>
+          <div class="category-item-meta">${courseCount} course${courseCount === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+      <div class="category-item-footer">
+        <span class="badge ${category.active ? 'badge-published' : 'badge-draft'}">${category.active ? 'ACTIVE' : 'INACTIVE'}</span>
+        ${category.description ? `<span class="category-item-note">${escapeHTML(category.description)}</span>` : ''}
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm"
+          style="margin-left:auto; color:#ef4444; border-color: rgba(239, 68, 68, 0.2);"
+          onclick="event.stopPropagation(); deleteCategory('${category.categoryId}', ${courseCount})"
+          title="Delete category (only allowed when it has no courses)"
+        >
+          🗑️ Delete
+        </button>
+      </div>
+    `;
+
+    container.appendChild(item);
+  });
+}
+
 function renderCoursesList() {
   const container = document.getElementById('courses-list');
   container.innerHTML = '';
-  
+
+  const visibleCourses = getVisibleCourses();
+
   if (state.courses.length === 0) {
-    container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:0.9rem">No courses found</div>';
+    container.innerHTML = '<div class="empty-stack"><div class="empty-stack-icon">📘</div><div class="empty-stack-title">No courses yet</div><div class="empty-stack-copy">Create a category first, then add the course you want to test.</div></div>';
+    return;
+  }
+
+  if (visibleCourses.length === 0) {
+    const category = getCategoryById(state.selectedCategoryId);
+    container.innerHTML = `<div class="empty-stack"><div class="empty-stack-icon">🧭</div><div class="empty-stack-title">No courses in ${escapeHTML(category?.name || 'this category')}</div><div class="empty-stack-copy">Use the New Course button to create one in the selected category.</div></div>`;
     return;
   }
   
-  state.courses.forEach(course => {
+  visibleCourses.forEach(course => {
     const isActive = course.courseId === state.selectedCourseId;
     const item = document.createElement('div');
     item.className = `course-item ${isActive ? 'active' : ''}`;
     item.onclick = () => selectCourse(course.courseId);
     
     item.innerHTML = `
+      <div class="course-item-eyebrow">${escapeHTML(course.categoryName || 'Uncategorized')}</div>
       <div class="course-item-title">${escapeHTML(course.title)}</div>
+      ${course.summary ? `<div class="course-item-summary">${escapeHTML(course.summary)}</div>` : ''}
       <div class="course-item-meta">
         <span class="badge badge-level">${escapeHTML(course.level)}</span>
         <span class="badge badge-${course.status.toLowerCase()}">${escapeHTML(course.status)}</span>
@@ -406,20 +661,50 @@ function renderCourseWorkspace() {
   const detail = state.selectedCourseDetail;
   if (!detail) {
     container.innerHTML = `
-      <div class="placeholder-view">
-        <div class="placeholder-icon">🗂️</div>
-        <h3>No Course Selected</h3>
-        <p>Choose an existing course from the sidebar or build a new one to start authoring.</p>
+      <div class="course-detail">
+        <div class="hierarchy-lab hierarchy-lab-empty">
+          <div>
+            <div class="hierarchy-eyebrow">Hierarchy Lab</div>
+            <h2>Category → Course → Module → Lesson</h2>
+            <p>Create a category, attach a course, and then build out the nested module tree to test the authoring APIs end to end.</p>
+          </div>
+          <div class="hierarchy-actions">
+            <button class="btn btn-secondary" onclick="openCreateCategoryModal()">+ New Category</button>
+            <button class="btn btn-primary" onclick="openCreateCourseModal()">+ New Course</button>
+          </div>
+        </div>
+        <div class="placeholder-view placeholder-card">
+          <div class="placeholder-icon">🗂️</div>
+          <h3>No Course Selected</h3>
+          <p>Pick a course from the sidebar or create a new one under the selected category.</p>
+        </div>
       </div>
     `;
     return;
   }
   
+  const selectedCategory = getCategoryById(detail.categoryId);
+  const moduleCount = detail.modules ? detail.modules.length : 0;
+  const lessonCount = detail.modules ? detail.modules.reduce((count, module) => count + (module.submodules ? module.submodules.length : 0), 0) : 0;
+  const blockCount = detail.modules ? detail.modules.reduce((count, module) => count + (module.submodules ? module.submodules.reduce((nestedCount, submodule) => nestedCount + (submodule.contentBlocks ? submodule.contentBlocks.length : 0), 0) : 0), 0) : 0;
   const isPublished = detail.status === 'PUBLISHED';
   
   // Render Course header & modules
   let html = `
     <div class="course-detail">
+      <div class="hierarchy-lab">
+        <div>
+          <div class="hierarchy-eyebrow">Hierarchy Lab</div>
+          <h2>${escapeHTML(detail.title)}</h2>
+          <p>${escapeHTML(selectedCategory?.name || detail.categoryName || 'Uncategorized')} · ${moduleCount} section${moduleCount === 1 ? '' : 's'}, ${lessonCount} lesson${lessonCount === 1 ? '' : 's'}, ${blockCount} block${blockCount === 1 ? '' : 's'}</p>
+        </div>
+        <div class="hierarchy-actions">
+          <button class="btn btn-secondary" onclick="openCreateCategoryModal()">+ New Category</button>
+          <button class="btn btn-primary" onclick="openCreateCourseModal()">+ New Course</button>
+          <button class="btn btn-secondary" onclick="openAddModuleModal()">+ Add Section</button>
+        </div>
+      </div>
+
       <div class="course-meta-card">
         <div class="course-meta-header">
           <div class="course-title-section">
@@ -427,6 +712,7 @@ function renderCourseWorkspace() {
             <h2>${escapeHTML(detail.title)}</h2>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
+            <a href="viewer.html?courseId=${detail.courseId}" target="_blank" class="btn btn-secondary" style="text-decoration: none; color: inherit; display: inline-flex; align-items: center; justify-content: center;">👁️ Preview as Viewer</a>
             <button class="btn btn-secondary" onclick="openEditCourseModal()">Edit Info</button>
             <button class="btn btn-danger" onclick="deleteActiveCourse()" style="background-color:#ef4444;border-color:#ef4444;color:white">Delete</button>
             ${isPublished 
@@ -438,6 +724,10 @@ function renderCourseWorkspace() {
         <p class="course-summary">${escapeHTML(detail.summary || 'No summary provided.')}</p>
         
         <div class="course-info-grid">
+          <div class="info-item">
+            <span class="info-label">Category</span>
+            <span class="info-value">${escapeHTML(detail.categoryName)}</span>
+          </div>
           <div class="info-item">
             <span class="info-label">Course ID</span>
             <span class="info-value" style="font-family:var(--font-mono);font-size:0.8rem">${detail.courseId}</span>
@@ -451,6 +741,10 @@ function renderCourseWorkspace() {
             <span class="info-value">
               <span class="badge badge-${detail.status.toLowerCase()}">${detail.status}</span>
             </span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Hierarchy</span>
+            <span class="info-value">${moduleCount} modules · ${lessonCount} lessons · ${blockCount} blocks</span>
           </div>
         </div>
       </div>
@@ -512,17 +806,28 @@ function renderCourseWorkspace() {
                 <div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:10px">No content blocks.</div>
             `;
           } else {
-            sub.contentBlocks.forEach(content => {
+            sub.contentBlocks.forEach((content, idx) => {
               html += `
                 <div class="content-block">
                   <div class="content-block-header">
                     <span class="content-block-type">${content.type}</span>
                     <div style="display:flex;align-items:center;gap:8px">
-                      <span>Order: ${content.sortOrder}</span>
-                      <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem;color:#ef4444" onclick="deleteContent('${content.contentId}')">🗑️</button>
+                      <div style="display:flex;align-items:center;gap:4px">
+                        ${idx > 0 ? `<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem" onclick="moveContentUp('${sub.submoduleId}', ${idx})" title="Move Up">↑</button>` : ''}
+                        ${idx < sub.contentBlocks.length - 1 ? `<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem" onclick="moveContentDown('${sub.submoduleId}', ${idx})" title="Move Down">↓</button>` : ''}
+                        <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem" onclick="openEditContentModal('${sub.submoduleId}', '${content.contentId}')" title="Edit">✏️</button>
+                        <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem;color:#ef4444;margin-left:4px" onclick="deleteContent('${content.contentId}')" title="Delete">🗑️</button>
+                      </div>
                     </div>
                   </div>
               `;
+
+              // Heading rendering (supports backend field headingLevel)
+              const headingLevel = content.headingLevel || '';
+              const headingTag = headingLevel ? headingLevel : null;
+              const headingHtml = headingTag ? `<div class="content-block-heading" style="margin-top:10px"><span class="badge badge-level" style="margin-bottom:6px;display:inline-block">Heading: ${escapeHTML(headingLevel)}</span></div>` : '';
+              
+              html += headingHtml;
               
               if (content.type === 'TEXT') {
                 html += `<div class="content-block-body">${escapeHTML(content.body)}</div>`;
@@ -578,7 +883,42 @@ function openAddSubmoduleModal(moduleId) {
 }
 
 function openAddContentModal(submoduleId) {
+  document.getElementById('form-content').reset();
   document.getElementById('target-submodule-id').value = submoduleId;
+  document.getElementById('target-content-id').value = '';
+  document.getElementById('content-modal-title').textContent = 'Add Content Block';
+  document.getElementById('content-submit-btn').textContent = 'Add Block';
+  handleContentTypeChange({target: {value: 'HEADING'}});
+  openModal('modal-content');
+}
+
+function openEditContentModal(submoduleId, contentId) {
+  const detail = state.selectedCourseDetail;
+  let sub = null;
+  for(let m of detail.modules) {
+     sub = m.submodules.find(s => s.submoduleId === submoduleId);
+     if(sub) break;
+  }
+  if (!sub) return;
+  const content = sub.contentBlocks.find(c => c.contentId === contentId);
+  if (!content) return;
+  
+  document.getElementById('form-content').reset();
+  document.getElementById('target-submodule-id').value = submoduleId;
+  document.getElementById('target-content-id').value = contentId;
+  document.getElementById('content-type').value = content.type;
+  document.getElementById('content-sort').value = content.sortOrder || 1;
+  document.getElementById('content-heading-level').value = content.headingLevel || '';
+  document.getElementById('content-heading-text').value = content.headingText || '';
+  document.getElementById('content-body').value = content.body || '';
+  document.getElementById('content-language').value = content.language || '';
+  document.getElementById('resolved-s3-key').value = content.s3Key || '';
+  
+  document.getElementById('content-modal-title').textContent = 'Edit Content Block';
+  document.getElementById('content-submit-btn').textContent = 'Update Block';
+  handleContentTypeChange({target: {value: content.type}});
+  handleHeadingLevelChange({target: {value: content.headingLevel || ''}});
+  
   openModal('modal-content');
 }
 
@@ -589,7 +929,7 @@ function handleContentTypeChange(e) {
   const codeGroup = document.getElementById('group-language');
   const mediaGroup = document.getElementById('group-media');
   
-  if (type === 'TEXT') {
+  if (['TEXT', 'QUOTE', 'HEADING'].includes(type)) {
     textGroup.style.display = 'block';
     codeGroup.style.display = 'none';
     mediaGroup.style.display = 'none';
@@ -602,6 +942,17 @@ function handleContentTypeChange(e) {
     textGroup.style.display = 'none';
     codeGroup.style.display = 'none';
     mediaGroup.style.display = 'block';
+  }
+}
+
+// Heading Level Conditional Styling
+function handleHeadingLevelChange(e) {
+  const level = e.target.value;
+  const headingInput = document.getElementById('content-heading-text');
+  
+  headingInput.className = 'form-control'; // reset class
+  if (level) {
+    headingInput.classList.add(`format-${level.toLowerCase()}`);
   }
 }
 
@@ -946,9 +1297,11 @@ window.openEditCourseModal = function() {
   const detail = state.selectedCourseDetail;
   if (!detail) return;
   
+  populateCategorySelects();
   document.getElementById('edit-course-title').value = detail.title;
   document.getElementById('edit-course-summary-input').value = detail.summary || '';
   document.getElementById('edit-course-level').value = detail.level;
+  document.getElementById('edit-course-category').value = detail.categoryId;
   
   openModal('modal-edit-course');
 };
@@ -960,12 +1313,18 @@ window.handleEditCourse = async function(e) {
   const title = document.getElementById('edit-course-title').value.trim();
   const summary = document.getElementById('edit-course-summary-input').value.trim();
   const level = document.getElementById('edit-course-level').value;
+  const categoryId = document.getElementById('edit-course-category').value;
+
+  if (!categoryId) {
+    showToast('Select a category before saving the course', 'error');
+    return;
+  }
   
   try {
     const updated = await fetchAPI(`/api/v1/trainer/courses/${state.selectedCourseId}`, {
       method: 'PUT',
       body: JSON.stringify({
-        domainId: state.defaultDomainId,
+        categoryId,
         title,
         summary,
         level
@@ -975,7 +1334,7 @@ window.handleEditCourse = async function(e) {
     showToast('Course metadata updated successfully');
     closeModal('modal-edit-course');
     await loadCourses();
-    selectCourse(state.selectedCourseId);
+    selectCourse(updated.courseId);
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -1058,6 +1417,43 @@ window.deleteSubmodule = async function(submoduleId) {
 
 // ── Content delete ──────────────────────────────────────────────
 
+window.editContentSortOrder = async function(contentId, currentSortOrder) {
+  const input = prompt('Edit content block order (sortOrder):', String(currentSortOrder));
+  if (input === null) return;
+  const next = parseInt(input);
+  if (Number.isNaN(next)) {
+    showToast('Invalid sortOrder number', 'error');
+    return;
+  }
+  try {
+    // Backend endpoint is expected to exist for content update incl. sortOrder
+    await fetchAPI(`/api/v1/trainer/content/${contentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ sortOrder: next })
+    });
+    showToast('Content order updated');
+    loadCourseDetail(state.selectedCourseId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+};
+
+window.editContentHeadingLevel = async function(contentId, currentHeadingLevel) {
+  const input = prompt('Edit content heading level (headingLevel). Use empty for none:', currentHeadingLevel || '');
+  if (input === null) return;
+  const next = input.trim();
+  try {
+    await fetchAPI(`/api/v1/trainer/content/${contentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ headingLevel: next || null })
+    });
+    showToast('Content heading updated');
+    loadCourseDetail(state.selectedCourseId);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+};
+
 window.deleteContent = async function(contentId) {
   if (!confirm('Delete this content block?')) return;
   try {
@@ -1068,6 +1464,7 @@ window.deleteContent = async function(contentId) {
     showToast(error.message, 'error');
   }
 };
+
 
 // ═══════════════════════════════════════════════════════════════
 // BATCH ROSTER — API & Rendering
@@ -1485,3 +1882,128 @@ window.removeLearnerFromBatch = async function(batchId, learnerId, learnerName) 
   }
 };
 
+// ── Category delete ───────────────────────────────────────────
+// Uses backend/API rules enforced in CategoryService.delete:
+// - 404 if not found
+// - 409/400 style error if the category has courses (cannot delete)
+//
+// Also keeps UI state consistent by refreshing categories and courses.
+window.deleteCategory = async function(categoryId, courseCount = 0) {
+  const category = getCategoryById(categoryId);
+  const name = category?.name || 'this category';
+
+  if (courseCount > 0) {
+    showToast(`Cannot delete ${name}: it contains ${courseCount} course(s).`, 'error');
+    return;
+  }
+
+  if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+
+  try {
+    await fetchAPI(`/api/v1/trainer/categories/${categoryId}`, { method: 'DELETE' });
+    showToast('Category deleted successfully');
+
+    // Refresh lists and keep selection stable
+    await Promise.all([loadCategories(), loadCourses()]);
+
+    if (state.selectedCategoryId === categoryId) {
+      // loadCategories() will auto-pick first available category, but ensure workspace refresh
+      renderCoursesList();
+      syncSelectedCourseWithCategory();
+    }
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+};
+
+// -------------------------------------------------------------
+// Content Reordering Methods
+// -------------------------------------------------------------
+
+async function moveContentUp(submoduleId, currentIdx) {
+  const detail = state.selectedCourseDetail;
+  let sub = null;
+  for(let m of detail.modules) {
+     sub = m.submodules.find(s => s.submoduleId === submoduleId);
+     if(sub) break;
+  }
+  if (!sub || currentIdx === 0) return;
+  
+  const orderedIds = sub.contentBlocks.map(c => c.contentId);
+  const temp = orderedIds[currentIdx - 1];
+  orderedIds[currentIdx - 1] = orderedIds[currentIdx];
+  orderedIds[currentIdx] = temp;
+  
+  await reorderContent(submoduleId, orderedIds);
+}
+
+async function moveContentDown(submoduleId, currentIdx) {
+  const detail = state.selectedCourseDetail;
+  let sub = null;
+  for(let m of detail.modules) {
+     sub = m.submodules.find(s => s.submoduleId === submoduleId);
+     if(sub) break;
+  }
+  if (!sub || currentIdx === sub.contentBlocks.length - 1) return;
+  
+  const orderedIds = sub.contentBlocks.map(c => c.contentId);
+  const temp = orderedIds[currentIdx + 1];
+  orderedIds[currentIdx + 1] = orderedIds[currentIdx];
+  orderedIds[currentIdx] = temp;
+  
+  await reorderContent(submoduleId, orderedIds);
+}
+
+async function reorderContent(submoduleId, orderedIds) {
+  try {
+    await fetchAPI(`/api/v1/trainer/submodules/${submoduleId}/content/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify(orderedIds)
+    });
+    showToast('Block moved successfully');
+    loadCourseDetail(state.selectedCourseId);
+  } catch (error) {
+    showToast('Failed to reorder blocks: ' + error.message, 'error');
+  }
+}
+
+// -------------------------------------------------------------
+// Local File Upload
+// -------------------------------------------------------------
+window.handleLocalUploadEvent = async function(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const statusSpan = document.getElementById('local-upload-status');
+  statusSpan.textContent = 'Uploading...';
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const res = await fetch('/api/v1/trainer/upload/local', {
+      method: 'POST',
+      headers: {
+        'X-Trainer-Id': state.trainerId
+      },
+      body: formData
+    });
+    
+    if (!res.ok) {
+      let errMsg = 'Upload failed';
+      try {
+         const errJson = await res.json();
+         if (errJson.message) errMsg = errJson.message;
+      } catch(e) {}
+      throw new Error(errMsg);
+    }
+    const data = await res.json();
+    
+    document.getElementById('resolved-s3-key').value = data.url;
+    document.getElementById('manual-s3-key').value = data.url;
+    statusSpan.textContent = 'Uploaded successfully!';
+    statusSpan.style.color = 'var(--emerald)';
+  } catch (error) {
+    statusSpan.textContent = 'Failed: ' + error.message;
+    statusSpan.style.color = 'var(--danger)';
+  }
+};

@@ -37,6 +37,9 @@ public class Content {
     @Column(name = "heading_level", length = 4)
     private String headingLevel;
 
+    @Column(name = "heading_text", length = 255)
+    private String headingText;
+
     @Column(columnDefinition = "TEXT")
     private String body;
 

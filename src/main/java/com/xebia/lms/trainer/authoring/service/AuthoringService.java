@@ -115,6 +115,7 @@ public class AuthoringService {
         content.setSubmodule(submodule);
         content.setType(form.type());
         content.setHeadingLevel(form.headingLevel());
+        content.setHeadingText(form.headingText());
         content.setBody(form.body());
         content.setS3Key(form.s3Key());
         content.setUrl(form.url());
@@ -329,6 +330,7 @@ public Content updateContent(UUID contentId, ContentForm form) {
 
     content.setType(form.type());
     content.setHeadingLevel(form.headingLevel());
+    content.setHeadingText(form.headingText());
     content.setBody(form.body());
     content.setS3Key(form.s3Key());
     content.setUrl(form.url());

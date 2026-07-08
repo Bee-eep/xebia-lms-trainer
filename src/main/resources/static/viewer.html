@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LMS Course Viewer</title>
+  <link rel="stylesheet" href="app.css">
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  
+  <!-- Highlight.js for Code Snippets -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  
+  <!-- Marked.js for Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    /* Viewer specific overrides that build on app.css */
+    
+    .viewer-layout {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg-main);
+    }
+
+    /* Sidebar */
+    .viewer-sidebar {
+      width: 340px;
+      background-color: var(--bg-surface);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 20;
+    }
+
+    .viewer-sidebar-header {
+      padding: 32px 24px 24px;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      background-color: var(--bg-surface);
+      z-index: 10;
+    }
+
+    .viewer-sidebar-header h2 {
+      margin: 0 0 10px 0;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .viewer-sidebar-header p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .viewer-nav {
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .module-nav-item {
+      padding: 0 24px;
+    }
+
+    .module-nav-title {
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .lesson-nav-item {
+      padding: 10px 16px 10px 32px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-radius: 0 24px 24px 0;
+      margin-right: 24px;
+      margin-bottom: 4px;
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .lesson-nav-item::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--primary);
+      transform: scaleY(0);
+      transition: transform 0.3s ease;
+      transform-origin: center;
+    }
+
+    .lesson-nav-item:hover {
+      background-color: var(--primary-bg-muted);
+      color: var(--text-main);
+    }
+
+    .lesson-nav-item.active {
+      background-color: var(--primary-bg-muted);
+      color: var(--primary);
+    }
+    
+    .lesson-nav-item.active::before {
+      transform: scaleY(1);
+    }
+    
+    /* Content headings inside sidebar */
+    .content-nav-list {
+      padding: 4px 16px 12px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .content-nav-item {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+    }
+    
+    .content-nav-item::before {
+      content: '•';
+      position: absolute;
+      left: -12px;
+      color: var(--text-muted);
+    }
+
+    .content-nav-item:hover {
+      color: var(--primary);
+    }
+    
+    .content-nav-item.active {
+      color: var(--primary);
+      font-weight: 600;
+    }
+    
+    .content-nav-item.active::before {
+      color: var(--primary);
+    }
+
+    /* Main Content */
+    .viewer-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      background-color: var(--bg-main);
+    }
+    
+    .viewer-header {
+      padding: 24px 64px;
+      border-bottom: 1px solid var(--border-color);
+      background-color: var(--bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .viewer-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .viewer-content-area {
+      padding: 64px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .content-block {
+      margin-bottom: 48px;
+      scroll-margin-top: 100px;
+      animation: fadeUp 0.5s ease forwards;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    
+    @keyframes fadeUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    /* Staggered animation for blocks */
+    .content-block:nth-child(1) { animation-delay: 0.1s; }
+    .content-block:nth-child(2) { animation-delay: 0.2s; }
+    .content-block:nth-child(3) { animation-delay: 0.3s; }
+    .content-block:nth-child(4) { animation-delay: 0.4s; }
+    .content-block:nth-child(5) { animation-delay: 0.5s; }
+
+    .content-quote blockquote {
+      font-style: italic;
+      border-left: 4px solid var(--primary);
+      padding: 16px 24px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .content-markdown {
+      line-height: 1.8;
+      color: var(--text-main);
+      font-size: 1.05rem;
+    }
+
+    .content-markdown p {
+      margin-top: 0;
+      margin-bottom: 1.5em;
+    }
+
+    .content-markdown a {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+
+    .content-markdown img {
+      max-width: 100%;
+      border-radius: var(--radius-md);
+      margin: 24px 0;
+      border: 1px solid var(--border-color);
+    }
+
+    .content-markdown code {
+      background-color: var(--bg-card);
+      padding: 0.2em 0.4em;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+
+    .content-markdown pre {
+      background-color: var(--bg-card);
+      padding: 24px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+    }
+
+    .content-markdown pre code {
+      background-color: transparent;
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+      border: none;
+    }
+
+    .content-media-image,
+    .content-media-video {
+      max-width: 100%;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+      background-color: var(--bg-card);
+    }
+
+    .content-media-pdf {
+      width: 100%;
+      height: 700px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      background: var(--bg-main);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 100px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 24px;
+    }
+
+    .empty-state h3 {
+      color: var(--text-main);
+      margin-bottom: 12px;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="viewer-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="viewer-sidebar">
+      <div class="viewer-sidebar-header">
+        <h2 id="course-title">Loading...</h2>
+        <p id="course-summary">Please wait while we load the course outline.</p>
+      </div>
+      <div class="viewer-nav" id="course-nav">
+        <!-- Dynamically populated -->
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="viewer-main" id="viewer-main-scroll">
+      <header class="viewer-header">
+        <h1 id="lesson-title">Select a Lesson</h1>
+        <button class="btn btn-secondary btn-sm" onclick="window.close()">Close Viewer</button>
+      </header>
+      
+      <div class="viewer-content-area" id="lesson-content">
+        <div class="empty-state">
+          <div class="empty-state-icon">📖</div>
+          <h3>Ready to Learn?</h3>
+          <p>Select a lesson from the sidebar to begin your journey.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="viewer.js"></script>
+</body>
+
+</html>

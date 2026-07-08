@@ -20,6 +20,9 @@ public record ContentForm(
         @Size(max = 4, message = "headingLevel must be H1-H6")
         String headingLevel,
 
+        @Size(max = 255, message = "headingText must not exceed 255 characters")
+        String headingText,
+
         String body,
 
         String s3Key,
