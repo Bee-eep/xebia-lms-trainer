@@ -159,6 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Wire S3 File uploader
   setupFileUploader();
+  setupCategoryImageUploader();
 
   // Load Initial Data
   loadCategories();
@@ -290,6 +291,9 @@ function closeModal(id) {
     // Reset specific elements
     handleContentTypeChange({ target: { value: 'TEXT' } });
     resetFileUpload();
+    if (id === 'modal-category') {
+      resetCategoryImageUpload();
+    }
   }
 }
 
@@ -590,9 +594,14 @@ function renderCategoriesList() {
     const colorStyle = color ? `style="background:${color};"` : '';
 
     // Prevent the click on the delete button from selecting the category
+    const isImage = category.icon && (category.icon.includes('/') || category.icon.includes('.') || category.icon.length > 8);
+    const iconContent = isImage 
+      ? `<img src="${escapeHTML(category.icon)}" alt="">`
+      : escapeHTML(category.icon || '📚');
+
     item.innerHTML = `
       <div class="category-item-top">
-        <div class="category-icon" ${colorStyle}>${escapeHTML(category.icon || '📚')}</div>
+        <div class="category-icon" ${colorStyle}>${iconContent}</div>
         <div class="category-item-copy">
           <div class="category-item-title">${escapeHTML(category.name)}</div>
           <div class="category-item-meta">${courseCount} course${courseCount === 1 ? '' : 's'}</div>
@@ -608,7 +617,7 @@ function renderCategoriesList() {
           onclick="event.stopPropagation(); deleteCategory('${category.categoryId}', ${courseCount})"
           title="Delete category (only allowed when it has no courses)"
         >
-          🗑️ Delete
+          Delete
         </button>
       </div>
     `;
@@ -775,7 +784,7 @@ function renderCourseWorkspace() {
             <div style="display:flex;gap:6px;align-items:center">
               <button class="btn btn-secondary btn-sm" onclick="openAddSubmoduleModal('${mod.moduleId}')">+ Add Lesson</button>
               <button class="btn btn-secondary btn-sm" onclick="openEditModuleModal('${mod.moduleId}', '${escapeHTML(mod.title).replace(/'/g, "\\'")}')">✏️</button>
-              <button class="btn btn-secondary btn-sm" onclick="deleteModule('${mod.moduleId}')" style="color:#ef4444">🗑️</button>
+              <button class="btn btn-secondary btn-sm" onclick="deleteModule('${mod.moduleId}')" style="color:#ef4444">Delete</button>
             </div>
           </div>
           <div class="submodules-list">
@@ -795,7 +804,7 @@ function renderCourseWorkspace() {
                   ${sub.estMinutes ? `<span class="submodule-est">⏱️ ${sub.estMinutes} mins</span>` : ''}
                   <button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:0.75rem" onclick="openAddContentModal('${sub.submoduleId}')">+ Add Block</button>
                   <button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:0.75rem" onclick="openEditSubmoduleModal('${sub.submoduleId}', '${escapeHTML(sub.title).replace(/'/g, "\\'")}')">✏️</button>
-                  <button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:0.75rem;color:#ef4444" onclick="deleteSubmodule('${sub.submoduleId}')">🗑️</button>
+                  <button class="btn btn-secondary btn-sm" style="padding:4px 8px;font-size:0.75rem;color:#ef4444" onclick="deleteSubmodule('${sub.submoduleId}')">Delete</button>
                 </div>
               </div>
               <div class="content-blocks-list">
@@ -816,7 +825,7 @@ function renderCourseWorkspace() {
                         ${idx > 0 ? `<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem" onclick="moveContentUp('${sub.submoduleId}', ${idx})" title="Move Up">↑</button>` : ''}
                         ${idx < sub.contentBlocks.length - 1 ? `<button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem" onclick="moveContentDown('${sub.submoduleId}', ${idx})" title="Move Down">↓</button>` : ''}
                         <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem" onclick="openEditContentModal('${sub.submoduleId}', '${content.contentId}')" title="Edit">✏️</button>
-                        <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem;color:#ef4444;margin-left:4px" onclick="deleteContent('${content.contentId}')" title="Delete">🗑️</button>
+                        <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:0.7rem;color:#ef4444;margin-left:4px" onclick="deleteContent('${content.contentId}')" title="Delete">Delete</button>
                       </div>
                     </div>
                   </div>
@@ -980,18 +989,13 @@ function setupFileUploader() {
     resolvedKeyInput.value = '';
     
     try {
-      // 1. Get presigned upload URL
-      const presignResponse = await fetchAPI(`/api/v1/trainer/content/media/presign?fileName=${encodeURIComponent(file.name)}&contentType=${encodeURIComponent(file.type)}`, {
-        method: 'POST'
-      });
+      // Create form data and upload to local folder directly
+      const formData = new FormData();
+      formData.append('file', file);
       
-      const { uploadUrl, s3Key } = presignResponse;
-      fileInfo.textContent = `Uploading S3 key: ${s3Key}...`;
-      
-      // 2. Upload directly to S3 PUT URL using raw XMLHttpRequest to track progress
       const xhr = new XMLHttpRequest();
-      xhr.open('PUT', uploadUrl, true);
-      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.open('POST', '/api/v1/trainer/upload/local', true);
+      xhr.setRequestHeader('X-Trainer-Id', state.trainerId);
       
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -1001,32 +1005,34 @@ function setupFileUploader() {
       };
       
       xhr.onload = () => {
-        if (xhr.status === 200 || xhr.status === 204) {
-          showToast('File uploaded to S3 successfully');
-          fileInfo.innerHTML = `✅ Uploaded!<br><span style="font-size:0.75rem;color:var(--text-muted)">Key: ${s3Key}</span>`;
-          resolvedKeyInput.value = s3Key;
+        if (xhr.status === 200 || xhr.status === 201) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            showToast('File uploaded successfully');
+            fileInfo.innerHTML = `✅ Uploaded!<br><span style="font-size:0.75rem;color:var(--text-muted)">Path: ${data.url}</span>`;
+            resolvedKeyInput.value = data.url;
+            if (document.getElementById('manual-s3-key')) {
+              document.getElementById('manual-s3-key').value = data.url;
+            }
+          } catch (e) {
+            showToast('Failed to parse upload response', 'error');
+          }
         } else {
-          throw new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`);
+          showToast(`Upload failed: ${xhr.status} ${xhr.statusText}`, 'error');
         }
       };
       
       xhr.onerror = () => {
-        throw new Error('S3 upload network connection failed.');
+        showToast('Upload network connection failed.', 'error');
       };
       
-      xhr.send(file);
+      xhr.send(formData);
       
     } catch (error) {
       console.error(error);
-      showToast('S3 Presign/Upload failed. See details below.', 'warning');
+      showToast('Upload failed: ' + error.message, 'error');
       progressBar.style.display = 'none';
-      fallbackBox.style.display = 'block';
-      fileInfo.innerHTML = `❌ S3 Presign/Upload error: ${error.message}`;
-      
-      // Generate a mock key for offline fallback testing
-      const mockKey = `content/${generateUUID()}-${file.name}`;
-      resolvedKeyInput.value = mockKey;
-      document.getElementById('manual-s3-key').value = mockKey;
+      fileInfo.innerHTML = `❌ Upload error: ${error.message}`;
     }
   });
   
@@ -1762,8 +1768,8 @@ function renderBatchWorkspace(filterText = '') {
               <td><span class="learner-email">${escapeHTML(learner.email)}</span></td>
               <td><span class="learner-date">${joinedDate}</span></td>
               <td style="text-align: right">
-                <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; margin-right: 6px;" onclick="openAddFeedbackModal('${learner.learnerId}', '${escapeHTML(learner.name).replace(/'/g, "\\'")}')">✍️ Feedback</button>
-                <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="removeLearnerFromBatch('${batch.batchId}', '${learner.learnerId}', '${escapeHTML(learner.name).replace(/'/g, "\\'")}')">🗑️ Remove</button>
+                <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; margin-right: 6px;" onclick="openAddFeedbackModal('${learner.learnerId}', '${escapeHTML(learner.name).replace(/'/g, "\\'")}')">Feedback</button>
+                <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; color: var(--danger); border-color: rgba(239, 68, 68, 0.2);" onclick="removeLearnerFromBatch('${batch.batchId}', '${learner.learnerId}', '${escapeHTML(learner.name).replace(/'/g, "\\'")}')">Remove</button>
               </td>
             </tr>
       `;
@@ -1784,7 +1790,7 @@ function renderBatchWorkspace(filterText = '') {
   if (state.batchFeedback.length === 0) {
     feedbackLogsHtml += `
       <div style="color:var(--text-muted); font-size:0.85rem; padding: 20px; background: rgba(255,255,255,0.01); border:1px solid var(--border-color); border-radius: var(--radius-md);">
-        No qualitative feedbacks recorded yet for this batch. Click "✍️ Feedback" next to a student to save notes.
+        No qualitative feedbacks recorded yet for this batch. Click "Feedback" next to a student to save notes.
       </div>
     `;
   } else {
@@ -2007,3 +2013,83 @@ window.handleLocalUploadEvent = async function(input) {
     statusSpan.style.color = 'var(--danger)';
   }
 };
+
+function setupCategoryImageUploader() {
+  const fileInput = document.getElementById('category-image-file');
+  const uploadWrapper = document.getElementById('category-upload-wrapper');
+  const progressBar = document.getElementById('category-image-progress');
+  const progressFill = document.getElementById('category-image-progress-fill');
+  const fileInfo = document.getElementById('category-image-info');
+  const resolvedKeyInput = document.getElementById('category-icon');
+  
+  if (!uploadWrapper) return;
+  
+  uploadWrapper.addEventListener('click', () => fileInput.click());
+  
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // UI Update
+    fileInfo.textContent = `Uploading: ${file.name}`;
+    progressBar.style.display = 'block';
+    progressFill.style.width = '0%';
+    resolvedKeyInput.value = '';
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/v1/trainer/upload/local', true);
+      xhr.setRequestHeader('X-Trainer-Id', state.trainerId);
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          progressFill.style.width = `${percent}%`;
+        }
+      };
+      
+      xhr.onload = () => {
+        if (xhr.status === 200 || xhr.status === 201) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            showToast('Image uploaded successfully');
+            fileInfo.innerHTML = `✅ Uploaded!<br><span style="font-size:0.75rem;color:var(--text-muted)">Path: ${data.url}</span>`;
+            resolvedKeyInput.value = data.url;
+          } catch (e) {
+            showToast('Failed to parse upload response', 'error');
+          }
+        } else {
+          showToast(`Upload failed: ${xhr.status} ${xhr.statusText}`, 'error');
+        }
+      };
+      
+      xhr.onerror = () => {
+        showToast('Upload network connection failed.', 'error');
+      };
+      
+      xhr.send(formData);
+      
+    } catch (error) {
+      console.error(error);
+      showToast('Upload failed: ' + error.message, 'error');
+      progressBar.style.display = 'none';
+      fileInfo.innerHTML = `❌ Upload error: ${error.message}`;
+    }
+  });
+}
+
+function resetCategoryImageUpload() {
+  const fileInput = document.getElementById('category-image-file');
+  if (fileInput) fileInput.value = '';
+  const fileInfo = document.getElementById('category-image-info');
+  if (fileInfo) fileInfo.textContent = 'Click to upload image';
+  const progressBar = document.getElementById('category-image-progress');
+  if (progressBar) progressBar.style.display = 'none';
+  const progressFill = document.getElementById('category-image-progress-fill');
+  if (progressFill) progressFill.style.width = '0%';
+  const resolvedKeyInput = document.getElementById('category-icon');
+  if (resolvedKeyInput) resolvedKeyInput.value = '';
+}

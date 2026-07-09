@@ -150,8 +150,16 @@
           </div>
           <div class="form-grid form-grid-2">
             <div class="form-group">
-              <label for="category-icon">Icon</label>
-              <input type="text" id="category-icon" class="form-control" placeholder="e.g. 📚" maxlength="64">
+              <label>Course Image</label>
+              <div id="category-upload-wrapper" class="file-upload-wrapper" style="padding: 10px;">
+                <div id="category-image-info" class="file-upload-text" style="font-size: 0.85rem;">Click to upload image</div>
+                <input type="file" id="category-image-file" class="file-upload-input" accept="image/*">
+                <!-- Progress Bar -->
+                <div id="category-image-progress" class="upload-progress-bar" style="margin-top: 5px;">
+                  <div id="category-image-progress-fill" class="upload-progress-fill"></div>
+                </div>
+              </div>
+              <input type="hidden" id="category-icon">
             </div>
             <div class="form-group">
               <label for="category-color">Color</label>

@@ -35,7 +35,7 @@ public class Category {
     @Column(nullable = false, length = 120, unique = true)
     private String name;
 
-    @Column(length = 64)
+    @Column(length = 2048)
     private String icon;
 
     @Column(length = 16)

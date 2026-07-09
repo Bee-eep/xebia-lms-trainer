@@ -15,7 +15,7 @@ public record CategoryForm(
         @Size(max = 120, message = "Category name must not exceed 120 characters")
         String name,
 
-        @Size(max = 64, message = "Icon must not exceed 64 characters")
+        @Size(max = 2048, message = "Icon must not exceed 2048 characters")
         String icon,
 
         @Size(max = 16, message = "Color must not exceed 16 characters")
